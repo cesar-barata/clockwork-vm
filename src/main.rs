@@ -1,72 +1,124 @@
-//#[derive(Debug)]
-pub struct Kinematic {
-	da: u64,
-	db: u64,
-	dc: u64,
-	dd: u64,
-	ip: u64,
-	f0: u64,
-	memory: [u64; 256]
-}
+mod kinematic {
+	use std::convert::From;
 
-// instruction
-// 2^8
-// MOV $A, $B, $C
+	//const MEMORY_SIZE: usize = 1024;
+	const INITIAL_IP: usize = 0;
 
-impl Kinematic {
-	pub fn new(memory: [u64; 256]) -> Kinematic {
-		Kinematic {
-			da: 0, db: 0, dc: 0, dd: 0,
-			ip: 0,
-			f0: 0,
-			memory
+	type Instruction = u64;
+
+	const OPCODE_OFFSET: usize = 60;
+
+	#[derive(Debug, PartialEq)]
+	enum Opcode {
+		ILG,
+		HLT,
+		LOAD,
+	}
+
+	impl From<Instruction> for Opcode {
+		fn from(value: Instruction) -> Opcode {
+			//println!("{}", value >> 60);
+			match value {
+				0 => Opcode::HLT,
+				1 => Opcode::LOAD,
+				x if x > 1024 => Opcode::ILG,
+				_ => Opcode::ILG
+			}
 		}
 	}
 
-	fn read_byte(instruction: u64, offset: u8) -> u8 {
-		//let eqv_offset = offset % 64;
-		(instruction >> (offset * 8)) as u8
+	pub struct Kinematic {
+		da: i64,
+		db: i64,
+		dc: i64,
+		dd: i64,
+		ip: usize,
+		f0: i64,
+		//memory: [u64; MEMORY_SIZE],
+		program: Vec<Instruction>,
+		running: bool
 	}
 
-	pub fn parse_instruction(instruction: u64) {
-		unimplemented!()
+	// instruction
+	// 2^8
+	// MOV $A, $B, $C
+
+	impl Kinematic {
+		pub fn new(program: Vec<Instruction>) -> Self {
+			Kinematic {
+				da: 0, db: 0, dc: 0, dd: 0,
+				ip: INITIAL_IP,
+				f0: 0,
+				//memory: [0; MEMORY_SIZE],
+				program,
+				running: true
+			}
+		}
+
+		fn fetch_next_instr(&mut self) -> u64 {
+			let instruction = self.program[self.ip];
+			self.ip += 1;
+			instruction
+		}
+
+		fn execute_next_instr(&mut self) {
+			let instruction = self.fetch_next_instr();
+
+			match Opcode::from(instruction) {
+				Opcode::HLT => panic!("EXIT"),
+				Opcode::LOAD => unimplemented!(),
+				Opcode::ILG => panic!("Illegal opcode")
+			}
+		}
 	}
-}
 
-#[cfg(test)]
-mod tests {
-	use super::*;
+	#[cfg(test)]
+	mod tests {
+		use super::*;
 
-	#[test]
-	fn read_instruction_from_first_bit() {
-		let expected = 6u8;
-		let actual = Kinematic::read_byte(0x0D0C0B0A09080706u64, 0);
-		assert_eq!(expected, actual);
-	}
+		#[test]
+		fn default_vm() {
+			let vm = Kinematic::new(vec![0; 0]);
+			assert_eq!(vm.da, 0);
+			assert_eq!(vm.db, 0);
+			assert_eq!(vm.dc, 0);
+			assert_eq!(vm.dd, 0);
+			assert_eq!(vm.ip, INITIAL_IP);
+			assert_eq!(vm.f0, 0);
+		}
 
-	#[test]
-	fn read_instruction_from_second_bit() {
-		let expected = 7u8;
-		let actual = Kinematic::read_byte(0x0D0C0B0A09080706u64, 1);
-		assert_eq!(expected, actual);
-	}
+		#[test]
+		fn fetch_next_instr() {
+			let program = vec![7, 8, 9];
+			let mut vm = Kinematic::new(program);
 
-	#[test]
-	fn read_instruction_from_eighth_bit() {
-		let expected = 13u8;
-		let actual = Kinematic::read_byte(0x0D0C0B0A09080706u64, 7);
-		assert_eq!(expected, actual);
-	}
+			let instruction = vm.fetch_next_instr();
+			let expected = 7;
+			assert_eq!(expected, instruction);
 
-	#[test]
-	fn default_Kinematic() {
-		let Kinematic = Kinematic::new([0; 256]);
-		assert_eq!(Kinematic.da, 0);
-		assert_eq!(Kinematic.db, 0);
-		assert_eq!(Kinematic.dc, 0);
-		assert_eq!(Kinematic.dd, 0);
-		assert_eq!(Kinematic.ip, 0);
-		assert_eq!(Kinematic.f0, 0);
+			let instruction = vm.fetch_next_instr();
+			let expected = 8;
+			assert_eq!(expected, instruction);
+
+			let instruction = vm.fetch_next_instr();
+			let expected = 9;
+			assert_eq!(expected, instruction);
+		}
+
+		#[test]
+		fn opcode_from_u64() {
+			let expected = Opcode::HLT;
+			let actual = Opcode::from(0);
+			assert_eq!(expected, actual);
+
+			let expected = Opcode::LOAD;
+			let actual = Opcode::from(1);
+			assert_eq!(expected, actual);
+
+			let expected = Opcode::ILG;
+			let actual = Opcode::from(1023);
+			assert_eq!(expected, actual);
+		}
 	}
 }
 
