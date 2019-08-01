@@ -4,25 +4,26 @@ mod kinematic {
 	//const MEMORY_SIZE: usize = 1024;
 	const INITIAL_IP: usize = 0;
 
-	type Instruction = u64;
+	type Word = u64;
 
 	const OPCODE_OFFSET: usize = 60;
 
 	#[derive(Debug, PartialEq)]
 	enum Opcode {
-		ILG,
-		HLT,
-		LOAD,
+		Illegal,
+		Halt,
+		OldLoad,
+		Load { a: Word },
 	}
 
-	impl From<Instruction> for Opcode {
-		fn from(value: Instruction) -> Opcode {
+	impl From<Word> for Opcode {
+		fn from(value: Word) -> Opcode {
 			//println!("{}", value >> 60);
 			match value {
-				0 => Opcode::HLT,
-				1 => Opcode::LOAD,
-				x if x > 1024 => Opcode::ILG,
-				_ => Opcode::ILG
+				0 => Opcode::Halt,
+				1 => Opcode::OldLoad,
+				x if x > 1024 => Opcode::Illegal,
+				_ => Opcode::Illegal
 			}
 		}
 	}
@@ -35,7 +36,7 @@ mod kinematic {
 		ip: usize,
 		f0: i64,
 		//memory: [u64; MEMORY_SIZE],
-		program: Vec<Instruction>,
+		program: Vec<Word>,
 		running: bool
 	}
 
@@ -44,14 +45,14 @@ mod kinematic {
 	// MOV $A, $B, $C
 
 	impl Kinematic {
-		pub fn new(program: Vec<Instruction>) -> Self {
+		pub fn new(program: Vec<Word>) -> Self {
 			Kinematic {
 				da: 0, db: 0, dc: 0, dd: 0,
 				ip: INITIAL_IP,
 				f0: 0,
 				//memory: [0; MEMORY_SIZE],
 				program,
-				running: true
+				running: false
 			}
 		}
 
@@ -61,14 +62,22 @@ mod kinematic {
 			instruction
 		}
 
-		fn execute_next_instr(&mut self) {
-			let instruction = self.fetch_next_instr();
+		fn step(&mut self) -> bool {
+			let instruction = &self.fetch_next_instr();
 
-			match Opcode::from(instruction) {
-				Opcode::HLT => panic!("EXIT"),
-				Opcode::LOAD => unimplemented!(),
-				Opcode::ILG => panic!("Illegal opcode")
+			match Opcode::from(*instruction) {
+				Opcode::Illegal => panic!("Illegal opcode"),
+				Opcode::Halt => false,
+				Opcode::OldLoad => {
+					self.perform_load(instruction)
+				},
+				_ => panic!("Unsupported instruction")
 			}
+		}
+
+		fn perform_load(&mut self, instruction: &u64) -> bool {
+			let operands = instruction >> 10;
+			unimplemented!()
 		}
 	}
 
@@ -85,6 +94,7 @@ mod kinematic {
 			assert_eq!(vm.dd, 0);
 			assert_eq!(vm.ip, INITIAL_IP);
 			assert_eq!(vm.f0, 0);
+			assert_eq!(vm.running, false);
 		}
 
 		#[test]
@@ -107,15 +117,15 @@ mod kinematic {
 
 		#[test]
 		fn opcode_from_u64() {
-			let expected = Opcode::HLT;
+			let expected = Opcode::Halt;
 			let actual = Opcode::from(0);
 			assert_eq!(expected, actual);
 
-			let expected = Opcode::LOAD;
+			let expected = Opcode::OldLoad;
 			let actual = Opcode::from(1);
 			assert_eq!(expected, actual);
 
-			let expected = Opcode::ILG;
+			let expected = Opcode::Illegal;
 			let actual = Opcode::from(1023);
 			assert_eq!(expected, actual);
 		}
