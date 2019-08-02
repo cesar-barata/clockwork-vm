@@ -18,11 +18,10 @@ mod kinematic {
 
     impl Instruction {
         fn parse_load(operands: u64) -> Self {
-            // TODO change operand order: DEST-VALUE-OPCODE
-            // load layout: 0b00000000000000000000000000000000000000000000000_00000000(_0000000000)
-            //                                  VALUE                           DEST     OPCODE
-            let dest_reg = operands as u8;
-            let value = (operands >> 8) as u64;
+            // load layout: 0b00000000_00000000000000000000000000000000000000000000000(_0000000000)
+            //                 DEST                         VALUE                         OPCODE
+            let value = (operands & 0b00000000_1111111111111111111111111111111111111111111111) as u64;
+            let dest_reg = (operands >> 46) as u8;
             Instruction::Load { value, dest_reg }
         }
 
@@ -38,7 +37,7 @@ mod kinematic {
 
 	impl From<Word> for Instruction {
 		fn from(instruction: Word) -> Self {
-            let opcode = (instruction & 0b0000001111111111) as u16;
+            let opcode = (instruction & 0b000000_1111111111) as u16;
             let operands = (instruction >> OPCODE_OFFSET) as u64;
 			match opcode {
 				0 => Instruction::Halt,
@@ -169,7 +168,7 @@ mod kinematic {
 			let actual = Instruction::from(instruction);
 			assert_eq!(expected, actual);
 
-            let instruction: Word = 0b0000000000000000000000000000000000001111101000_00001010_0000000001;
+            let instruction: Word = 0b00001010_0000000000000000000000000000000000001111101000_0000000001;
             let expected = Instruction::Load { dest_reg: 10, value: 1000 };
 			let actual = Instruction::from(instruction);
 			assert_eq!(expected, actual);
@@ -179,14 +178,14 @@ mod kinematic {
         fn load_affects_registers() {
             let instruction: Word = 0b0000000000000000000000000000000000000000001101_00000000_0000000001;
             let expected_da = 0b1101;
-            let expected_db = 0b0110_0010;
+            let expected_db = 0b0110_0100;
             let expected_dc = 0b0110_0001;
             let expected_dd = 0b0011_0010_1001_0100;
             let program = vec![
-                0b0000000000000000000000000000000000000000001101_00000000_0000000001u64, // load $13, da
-                0b0000000000000000000000000000000000000001100010_00000001_0000000001u64, // load $100, db
-                0b0000000000000000000000000000000000000001100001_00000010_0000000001u64, // load $99, dc
-                0b0000000000000000000000000000000011001010010100_00000011_0000000001u64, // load $12948, db
+                0b00000000_0000000000000000000000000000000000000000001101_0000000001u64, // load $13, da
+                0b00000001_0000000000000000000000000000000000000001100100_0000000001u64, // load $100, db
+                0b00000010_0000000000000000000000000000000000000001100001_0000000001u64, // load $99, dc
+                0b00000011_0000000000000000000000000000000011001010010100_0000000001u64, // load $12948, db
             ];
             let mut vm = Kinematic::new(program);
             vm.step();
