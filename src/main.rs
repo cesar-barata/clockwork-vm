@@ -1,11 +1,16 @@
+mod state_machine {
+    pub enum State<Ph> {
+        FetchInstruction { next: Ph }
+    }
+}
+
 mod kinematic {
 	use std::convert::From;
+	
+    type Word = u64;
 
 	//const MEMORY_SIZE: usize = 1024;
 	const INITIAL_IP: usize = 0;
-
-	type Word = u64;
-
 	const OPCODE_OFFSET: usize = 10;
 
 	#[derive(Debug, PartialEq)]
