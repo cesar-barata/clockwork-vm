@@ -1,12 +1,7 @@
 mod kinematic {
 	use std::convert::From;
 
-	//const MEMORY_SIZE: usize = 1024;
-	const INITIAL_IP: usize = 0;
-
 	type Word = u64;
-
-	const OPCODE_OFFSET: usize = 10;
 
 	#[derive(Debug, PartialEq)]
 	enum Instruction {
@@ -16,29 +11,52 @@ mod kinematic {
         Add { src1: u8, src2: u8, dest: u8  }
 	}
 
+	/*
+	 * For each instruction there is a corresponding parsing function to be used on the
+	 * implementation for the "From" trait.	Each function has a comment describing the
+	 * binary layout of the instruction.
+	 */
     impl Instruction {
+    	const OPCODE_OFFSET: usize = 10;
+		const OPCODE_MASK: u64 = 0b000000_1111111111;
+
+		const LOAD_RANDS_MASK: u64 = 0b00000000_1111111111111111111111111111111111111111111111;
+		const LOAD_DEST_OFFSET: usize = 46;
+
+		const ADD_RAND2_OFFSET: usize = 18;
+		const ADD_DEST_OFFSET: usize = 36;
+
+    	/*
+    	 * LOAD
+    	 *
+    	 *    DEST                         VALUE                         OPCODE
+         * 0b00000000_00000000000000000000000000000000000000000000000(_0000000000)
+         * 
+         */
         fn parse_load(operands: u64) -> Self {
-            // load layout: 0b00000000_00000000000000000000000000000000000000000000000(_0000000000)
-            //                 DEST                         VALUE                         OPCODE
-            let value = (operands & 0b00000000_1111111111111111111111111111111111111111111111) as u64;
-            let dest_reg = (operands >> 46) as u8;
+            let value = (operands & Self::LOAD_RANDS_MASK) as u64;
+            let dest_reg = (operands >> Self::LOAD_DEST_OFFSET) as u8;
             Instruction::Load { value, dest_reg }
         }
 
+        /*
+         * ADD
+         *
+    	 *          DEST               SRC2               SRC1           OPCODE
+         * 0b000000000000000000_000000000000000000_000000000000000000(_0000000000)
+         */
         fn parse_add(operands: u64) -> Self {
-            // add layout: 0b000000000000000000_000000000000000000_000000000000000000(_0000000000)
-            //                     DEST               SRC2               SRC1           OPCODE
             let src1 = operands as u8;
-            let src2 = (operands >> 18) as u8;
-            let dest = (operands >> 36) as u8;
+            let src2 = (operands >> Self::ADD_RAND2_OFFSET) as u8;
+            let dest = (operands >> Self::ADD_DEST_OFFSET) as u8;
             Instruction::Add { src1, src2, dest }
         }
     }
 
 	impl From<Word> for Instruction {
 		fn from(instruction: Word) -> Self {
-            let opcode = (instruction & 0b000000_1111111111) as u16;
-            let operands = (instruction >> OPCODE_OFFSET) as u64;
+            let opcode = (instruction & Self::OPCODE_MASK) as u16;
+            let operands = (instruction >> Self::OPCODE_OFFSET) as u64;
 			match opcode {
 				0 => Instruction::Halt,
                 1 => Self::parse_load(operands),
@@ -62,15 +80,14 @@ mod kinematic {
 		running: bool
 	}
 
-	// instruction
-	// 2^8
-	// MOV $A, $B, $C
-
 	impl Kinematic {
+		//const MEMORY_SIZE: usize = 1024;
+		const INITIAL_IP: usize = 0;
+
 		pub fn new(program: Vec<Word>) -> Self {
 			Kinematic {
 				da: 0, db: 0, dc: 0, dd: 0,
-				ip: INITIAL_IP,
+				ip: Self::INITIAL_IP,
 				f0: 0,
 				//memory: [0; MEMORY_SIZE],
 				program,
@@ -117,8 +134,8 @@ mod kinematic {
             }
 		}
 
-        fn perform_add(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-            unimplemented!()
+        fn perform_add(&mut self, _src1: u8, _src2: u8, _dest: u8) -> bool {
+            todo!()
         }
 	}
 
@@ -133,7 +150,7 @@ mod kinematic {
 			assert_eq!(vm.db, 0);
 			assert_eq!(vm.dc, 0);
 			assert_eq!(vm.dd, 0);
-			assert_eq!(vm.ip, INITIAL_IP);
+			assert_eq!(vm.ip, Kinematic::INITIAL_IP);
 			assert_eq!(vm.f0, 0);
 			assert_eq!(vm.running, false);
 		}
@@ -176,7 +193,6 @@ mod kinematic {
 
         #[test]
         fn load_affects_registers() {
-            let instruction: Word = 0b0000000000000000000000000000000000000000001101_00000000_0000000001;
             let expected_da = 0b1101;
             let expected_db = 0b0110_0100;
             let expected_dc = 0b0110_0001;
