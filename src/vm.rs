@@ -72,7 +72,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_vm() {
+    fn brand_new_vm_has_default_values() {
         let vm = Clockwork::new(vec![0; 0]);
         assert_eq!(vm.registers, [
             0i64,
@@ -86,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn fetch_next_instr() {
+    fn fetching_next_instruction_consumes_previous_ones() {
         let program = vec![7, 8, 9];
         let mut vm = Clockwork::new(program);
 
