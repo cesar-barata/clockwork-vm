@@ -110,6 +110,9 @@ mod tests {
         let expected_d2 = 0b0110_0001;
         let expected_d3 = 0b0011_0010_1001_0100;
         
+        /*
+         * Writes to d0, d1, d2, d3 at each step
+         */
         let program = vec![
             0b00000000_0000000000000000000000000000000000000000001101_0000000001u64, // load $13, d0
             0b00000001_0000000000000000000000000000000000000001100100_0000000001u64, // load $100, d1
@@ -150,5 +153,21 @@ mod tests {
         assert_eq!(expected_d3, vm.registers[Clockwork::REG_D3]);
         assert_eq!(4, vm.registers[Clockwork::REG_IP]);
         assert_eq!(0, vm.registers[Clockwork::REG_F0]);
+    }
+
+    #[test]
+    fn shouldnt_write_to_read_only_regs() {
+        let expected_f0 = 1;
+
+        /*
+         * Tries to load the number 5 to register f0
+         */
+        let program = vec![
+            0b00000101_0000000000000000000000000000000000000000001101_0000000001u64
+        ];
+        let mut vm = Clockwork::new(program);
+
+        vm.step();
+        assert_eq!(expected_f0, vm.registers[Clockwork::REG_F0]);
     }
 }
