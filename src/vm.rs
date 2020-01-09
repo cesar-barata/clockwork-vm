@@ -63,7 +63,15 @@ impl Clockwork {
     }
 
     fn perform_add(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-        todo!()
+        if Self::is_reg_writable(dest as usize) {
+            let v1 = self.registers[src1 as usize];
+            let v2 = self.registers[src2 as usize];
+            self.registers[dest as usize] = v1 + v2;
+            self.registers[Self::REG_F0] = 0;
+        } else {
+            self.registers[Self::REG_F0] = 1;
+        }
+        true
     }
 }
 
@@ -169,5 +177,36 @@ mod tests {
 
         vm.step();
         assert_eq!(expected_f0, vm.registers[Clockwork::REG_F0]);
+    }
+
+    #[test]
+    fn addition_should_preserve_operand_regs_and_update_dest_reg() {
+        let expected_result = 5000;
+
+        /*
+         * Loads 2000 and 3000 to d0 and d1 respectively, then performs addition with destination d3
+         */
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
+            0b000000000000000011_000000000000000001_000000000000000000_0000000010u64
+        ];
+        let mut vm = Clockwork::new(program);
+
+        vm.step();
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        
+        vm.step();
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+
+        vm.step();
+        println!("{:?}", vm.registers);
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
     }
 }
