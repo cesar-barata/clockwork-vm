@@ -1,5 +1,5 @@
 [package]
-name = "kinematic"
+name = "clockwork-vm"
 version = "0.1.0"
 authors = ["Cesar Barata <cesar.adbarata@gmail.com>"]
 edition = "2018"

@@ -2,7 +2,7 @@ pub type Word = u64;
 
 use crate::instruction::Instruction;
 
-pub struct Kinematic {
+pub struct Clockwork {
     // TODO represent writable registers as array
     da: i64,
     db: i64,
@@ -15,12 +15,12 @@ pub struct Kinematic {
     running: bool
 }
 
-impl Kinematic {
+impl Clockwork {
     //const MEMORY_SIZE: usize = 1024;
     const INITIAL_IP: usize = 0;
 
     pub fn new(program: Vec<Word>) -> Self {
-        Kinematic {
+        Clockwork {
             da: 0, db: 0, dc: 0, dd: 0,
             ip: Self::INITIAL_IP,
             f0: 0,
@@ -80,12 +80,12 @@ mod tests {
 
     #[test]
     fn default_vm() {
-        let vm = Kinematic::new(vec![0; 0]);
+        let vm = Clockwork::new(vec![0; 0]);
         assert_eq!(vm.da, 0);
         assert_eq!(vm.db, 0);
         assert_eq!(vm.dc, 0);
         assert_eq!(vm.dd, 0);
-        assert_eq!(vm.ip, Kinematic::INITIAL_IP);
+        assert_eq!(vm.ip, Clockwork::INITIAL_IP);
         assert_eq!(vm.f0, 0);
         assert_eq!(vm.running, false);
     }
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn fetch_next_instr() {
         let program = vec![7, 8, 9];
-        let mut vm = Kinematic::new(program);
+        let mut vm = Clockwork::new(program);
 
         let instruction = vm.fetch_next_instr();
         let expected = 7;
@@ -120,7 +120,7 @@ mod tests {
             0b00000010_0000000000000000000000000000000000000001100001_0000000001u64, // load $99, dc
             0b00000011_0000000000000000000000000000000011001010010100_0000000001u64, // load $12948, db
         ];
-        let mut vm = Kinematic::new(program);
+        let mut vm = Clockwork::new(program);
         vm.step();
         assert_eq!(expected_da, vm.da);
         assert_eq!(0, vm.db);

@@ -1,4 +1,4 @@
-use crate::kinematic::Word;
+use crate::vm::Word;
 
 use std::convert::From;
 
