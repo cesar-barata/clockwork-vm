@@ -1,2 +1,2 @@
 mod instruction;
-mod vm;
+pub mod vm;

@@ -10,7 +10,7 @@ pub struct Clockwork {
 }
 
 impl Clockwork {
-    const NUM_REGS: usize = 6;
+    const NUM_REGS: usize = 7;
     //const MEMORY_SIZE: usize = 1024;
 
     const REG_D0: usize = 0;
@@ -19,12 +19,13 @@ impl Clockwork {
     const REG_D3: usize = 3;
     const REG_IP: usize = 4;
     const REG_F0: usize = 5;
+    const REG_F1: usize = 6;
 
     const INITIAL_IP: usize = 0;
 
     pub fn new(program: Vec<Word>) -> Self {
         Clockwork {
-            registers: [0, 0, 0, 0, Self::INITIAL_IP as i64, 0],
+            registers: [0, 0, 0, 0, Self::INITIAL_IP as i64, 0, 0],
             //memory: [0; MEMORY_SIZE],
             program,
             running: false
@@ -37,21 +38,22 @@ impl Clockwork {
         instruction
     }
 
-    fn step(&mut self) -> bool {
+    pub fn step(&mut self) -> bool {
         let instruction = &self.fetch_next_instr();
 
         match Instruction::from(*instruction) {
-            Instruction::Illegal => panic!("Illegal opcode"),
-            Instruction::Halt => false,
-            Instruction::Load { value, dest_reg } => self.perform_load(value, dest_reg),
-            Instruction::Add { src1, src2, dest } => self.perform_add(src1, src2, dest),
-            Instruction::Sub { src1, src2, dest } => self.perform_sub(src1, src2, dest),
-            Instruction::Mult { src1, src2, dest } => self.perform_mult(src1, src2, dest),
+            Instruction::Illegal                    => panic!("Illegal opcode"),
+            Instruction::Halt                       => false,
+            Instruction::Load { value, dest_reg }   => self.perform_load(value, dest_reg),
+            Instruction::Add { src1, src2, dest }   => self.perform_add(src1, src2, dest),
+            Instruction::Sub { src1, src2, dest }   => self.perform_sub(src1, src2, dest),
+            Instruction::Mult { src1, src2, dest }  => self.perform_mult(src1, src2, dest),
+            Instruction::Cmp { src1, src2 }         => self.perform_cmp(src1, src2),
         }
     }
 
     fn is_reg_writable(index: usize) -> bool {
-        index != Self::REG_F0
+        index != Self::REG_F0 && index != Self::REG_F1
     }
 
     fn perform_load(&mut self, value: u64, dest_reg: u8) -> bool {
@@ -99,6 +101,13 @@ impl Clockwork {
         }
         true
     }
+
+    fn perform_cmp(&mut self, src1: u8, src2: u8) ->  bool {
+        let v1 =  self.registers[src1 as usize];
+        let v2 =  self.registers[src2 as usize];
+        self.registers[Self::REG_F1] = if v1 == v2 { 1 } else { 0 };
+        true
+    }
 }
 
 #[cfg(test)]
@@ -114,7 +123,8 @@ mod tests {
             0i64,
             0i64,
             Clockwork::INITIAL_IP as i64,
-            0i64
+            0i64,
+            0i64,
         ]);
         assert_eq!(vm.running, false);
     }
@@ -296,5 +306,30 @@ mod tests {
         assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
         assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
         assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
+    }
+
+    #[test]
+    fn cmp_should_affect_f1_reg() {
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
+            0b00000010_0000000000000000000000000000000000011111010000_0000000001u64,
+            0b000000000000000000000000001_000000000000000000000000000_0000000101u64,
+            0b000000000000000000000000010_000000000000000000000000000_0000000101u64,
+        ];
+        let mut vm = Clockwork::new(program);
+
+        // perform the 3 loads
+        vm.step();
+        vm.step();
+        vm.step();
+
+        // perform first comparison
+        vm.step();
+        assert_eq!(0, vm.registers[Clockwork::REG_F1]);
+
+        // perform second comparison
+        vm.step();
+        assert_eq!(1, vm.registers[Clockwork::REG_F1]);
     }
 }
