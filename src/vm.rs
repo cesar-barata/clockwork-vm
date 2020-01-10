@@ -45,6 +45,8 @@ impl Clockwork {
             Instruction::Halt => false,
             Instruction::Load { value, dest_reg } => self.perform_load(value, dest_reg),
             Instruction::Add { src1, src2, dest } => self.perform_add(src1, src2, dest),
+            Instruction::Sub { src1, src2, dest } => self.perform_sub(src1, src2, dest),
+            Instruction::Mult { src1, src2, dest } => self.perform_mult(src1, src2, dest),
         }
     }
 
@@ -67,6 +69,30 @@ impl Clockwork {
             let v1 = self.registers[src1 as usize];
             let v2 = self.registers[src2 as usize];
             self.registers[dest as usize] = v1 + v2;
+            self.registers[Self::REG_F0] = 0;
+        } else {
+            self.registers[Self::REG_F0] = 1;
+        }
+        true
+    }
+
+    fn perform_sub(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
+        if Self::is_reg_writable(dest as usize) {
+            let v1 = self.registers[src1 as usize];
+            let v2 = self.registers[src2 as usize];
+            self.registers[dest as usize] = v1 - v2;
+            self.registers[Self::REG_F0] = 0;
+        } else {
+            self.registers[Self::REG_F0] = 1;
+        }
+        true
+    }
+
+    fn perform_mult(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
+        if Self::is_reg_writable(dest as usize) {
+            let v1 = self.registers[src1 as usize];
+            let v2 = self.registers[src2 as usize];
+            self.registers[dest as usize] = v1 * v2;
             self.registers[Self::REG_F0] = 0;
         } else {
             self.registers[Self::REG_F0] = 1;
@@ -190,6 +216,68 @@ mod tests {
             0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
             0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
             0b000000000000000011_000000000000000001_000000000000000000_0000000010u64
+        ];
+        let mut vm = Clockwork::new(program);
+
+        vm.step();
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        
+        vm.step();
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+
+        vm.step();
+        println!("{:?}", vm.registers);
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
+    }
+
+    #[test]
+    fn subtraction_should_preserve_operand_regs_and_update_dest_reg() {
+        let expected_result = -1000;
+
+        /*
+         * Loads 2000 and 3000 to d0 and d1 respectively, then performs subtraction with destination d3
+         */
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
+            0b000000000000000011_000000000000000001_000000000000000000_0000000011u64
+        ];
+        let mut vm = Clockwork::new(program);
+
+        vm.step();
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        
+        vm.step();
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+
+        vm.step();
+        println!("{:?}", vm.registers);
+        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
+    }
+
+    #[test]
+    fn multiplication_should_preserve_operand_regs_and_update_dest_reg() {
+        let expected_result = 6_000_000;
+
+        /*
+         * Loads 2000 and 3000 to d0 and d1 respectively, then performs multiplication with destination d3
+         */
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
+            0b000000000000000011_000000000000000001_000000000000000000_0000000100u64
         ];
         let mut vm = Clockwork::new(program);
 

@@ -7,7 +7,9 @@ pub enum Instruction {
     Illegal,
     Halt,
     Load { value: Word, dest_reg: u8 },
-    Add { src1: u8, src2: u8, dest: u8  }
+    Add { src1: u8, src2: u8, dest: u8 },
+    Sub { src1: u8, src2: u8, dest: u8 },
+    Mult { src1: u8, src2: u8, dest: u8 },
 }
 
 /*
@@ -24,6 +26,12 @@ impl Instruction {
 
     const ADD_RAND2_OFFSET: usize = 18;
     const ADD_DEST_OFFSET: usize = 36;
+
+    const SUB_RAND2_OFFSET: usize = 18;
+    const SUB_DEST_OFFSET: usize = 36;
+
+    const MULT_RAND2_OFFSET: usize = 18;
+    const MULT_DEST_OFFSET: usize = 36;
 
     /*
      * LOAD
@@ -50,6 +58,32 @@ impl Instruction {
         let dest = (operands >> Self::ADD_DEST_OFFSET) as u8;
         Instruction::Add { src1, src2, dest }
     }
+
+    /*
+     * SUB
+     *
+     *          DEST               SRC2               SRC1           OPCODE
+     * 0b000000000000000000_000000000000000000_000000000000000000(_0000000000)
+     */
+    fn parse_sub(operands: u64) -> Self {
+        let src1 = operands as u8;
+        let src2 = (operands >> Self::SUB_RAND2_OFFSET) as u8;
+        let dest = (operands >> Self::SUB_DEST_OFFSET) as u8;
+        Instruction::Sub { src1, src2, dest }
+    }
+
+    /*
+     * MULT
+     *
+     *          DEST               SRC2               SRC1           OPCODE
+     * 0b000000000000000000_000000000000000000_000000000000000000(_0000000000)
+     */
+    fn parse_mult(operands: u64) -> Self {
+        let src1 = operands as u8;
+        let src2 = (operands >> Self::MULT_RAND2_OFFSET) as u8;
+        let dest = (operands >> Self::MULT_DEST_OFFSET) as u8;
+        Instruction::Mult { src1, src2, dest }
+    }
 }
 
 impl From<Word> for Instruction {
@@ -60,6 +94,8 @@ impl From<Word> for Instruction {
             0 => Instruction::Halt,
             1 => Self::parse_load(operands),
             2 => Self::parse_add(operands),
+            3 => Self::parse_sub(operands),
+            4 => Self::parse_mult(operands),
             x if x > 1024 => Instruction::Illegal, // we have only 2.pow(10) = 1024 opcode slots
             _ => Instruction::Illegal              // for still unimplemented instructions
         }
