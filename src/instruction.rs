@@ -10,7 +10,8 @@ pub enum Instruction {
     Add { src1: u8, src2: u8, dest: u8 },
     Sub { src1: u8, src2: u8, dest: u8 },
     Mult { src1: u8, src2: u8, dest: u8 },
-    Cmp { src1: u8, src2: u8 }
+    Cmp { src1: u8, src2: u8 },
+    Jmp { src: u8 },
 }
 
 /*
@@ -99,6 +100,16 @@ impl Instruction {
         let src2 = (operands >> Self::CMP_RAND2_OFFSET) as u8;
         Instruction::Cmp { src1, src2 }
     }
+
+    /*
+     * JMP
+     *
+     *                            SRC                               OPCODE
+     * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
+     */
+    fn parse_jmp(operands: u64) -> Self {
+        Instruction::Jmp { src: operands as u8 }
+    }
 }
 
 impl From<Word> for Instruction {
@@ -112,6 +123,7 @@ impl From<Word> for Instruction {
             3 => Self::parse_sub(operands),
             4 => Self::parse_mult(operands),
             5 => Self::parse_cmp(operands),
+            6 => Self::parse_jmp(operands),
             x if x > 1024 => Instruction::Illegal, // we have only 2.pow(10) = 1024 opcode slots
             _ => Instruction::Illegal              // for still unimplemented instructions
         }

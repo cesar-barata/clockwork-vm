@@ -49,6 +49,7 @@ impl Clockwork {
             Instruction::Sub { src1, src2, dest }   => self.perform_sub(src1, src2, dest),
             Instruction::Mult { src1, src2, dest }  => self.perform_mult(src1, src2, dest),
             Instruction::Cmp { src1, src2 }         => self.perform_cmp(src1, src2),
+            Instruction::Jmp { src }                => self.perform_jmp(src),
         }
     }
 
@@ -106,6 +107,12 @@ impl Clockwork {
         let v1 =  self.registers[src1 as usize];
         let v2 =  self.registers[src2 as usize];
         self.registers[Self::REG_F1] = if v1 == v2 { 1 } else { 0 };
+        true
+    }
+
+    fn perform_jmp(&mut self, src: u8) -> bool {
+        let v = self.registers[src as usize];
+        self.registers[Self::REG_IP] = v;
         true
     }
 }
@@ -240,7 +247,6 @@ mod tests {
         assert_eq!(0, vm.registers[Clockwork::REG_D3]);
 
         vm.step();
-        println!("{:?}", vm.registers);
         assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
         assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
         assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
@@ -271,7 +277,6 @@ mod tests {
         assert_eq!(0, vm.registers[Clockwork::REG_D3]);
 
         vm.step();
-        println!("{:?}", vm.registers);
         assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
         assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
         assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
@@ -302,7 +307,6 @@ mod tests {
         assert_eq!(0, vm.registers[Clockwork::REG_D3]);
 
         vm.step();
-        println!("{:?}", vm.registers);
         assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
         assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
         assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
@@ -331,5 +335,57 @@ mod tests {
         // perform second comparison
         vm.step();
         assert_eq!(1, vm.registers[Clockwork::REG_F1]);
+    }
+
+    #[test]
+    fn jmp_should_affect_ip_reg() {
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000000000000100_0000000001u64,    // load $4, d0
+            0b00000000_0000000000000000000000000000000000000000000011_0000000001u64,    // load $3, d0
+            0b00000000_0000000000000000000000000000000000000000000010_0000000001u64,    // load $2, d0
+            0b00000001_0000000000000000000000000000000000000000000001_0000000001u64,    // load $1, d1
+            0b000000000000000000000000000000000000000000000000000001_0000000110u64,     // jmp d1
+        ];
+        let mut vm = Clockwork::new(program);
+
+        assert_eq!(0, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        
+        vm.step();  // load $4, d0
+
+        assert_eq!(1, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(4, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        
+        vm.step();  // load $3, d0
+
+        assert_eq!(2, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(3, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        
+        vm.step();  // load $2, d0
+
+        assert_eq!(3, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(2, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+
+        vm.step();  // load $1, d1
+        
+        assert_eq!(4, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(2, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(1, vm.registers[Clockwork::REG_D1]);
+
+        vm.step();  // jmp d1
+
+        assert_eq!(1, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(2, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(1, vm.registers[Clockwork::REG_D1]);
+
+        vm.step();  // load $3, d0
+
+        assert_eq!(2, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(3, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(1, vm.registers[Clockwork::REG_D1]);
     }
 }
