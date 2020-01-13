@@ -38,7 +38,7 @@ impl Clockwork {
         instruction
     }
 
-    pub fn step(&mut self) -> bool {
+    fn step(&mut self) -> bool {
         let instruction = &self.fetch_next_instr();
 
         match Instruction::from(*instruction) {
@@ -56,6 +56,12 @@ impl Clockwork {
             Instruction::Jneq { src }                             => self.perform_jneq(src),
             Instruction::Jgt { src }                              => self.perform_jgt(src),
             Instruction::Jlt { src }                              => self.perform_jlt(src),
+        }
+    }
+
+    pub fn run(&mut self) {
+        while self.running {
+            self.running = self.step();
         }
     }
 
