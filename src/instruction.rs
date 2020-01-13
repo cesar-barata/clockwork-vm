@@ -10,6 +10,7 @@ pub enum Instruction {
     Add { src1: u8, src2: u8, dest: u8 },
     Sub { src1: u8, src2: u8, dest: u8 },
     Mult { src1: u8, src2: u8, dest: u8 },
+    Div { src1: u8, src2: u8, quot_dest: u8, rem_dest: u8 },
     Cmp { src1: u8, src2: u8 },
     Jmp { src: u8 },
     Jeq { src: u8 },
@@ -38,6 +39,10 @@ impl Instruction {
 
     const MULT_RAND2_OFFSET: usize = 18;
     const MULT_DEST_OFFSET: usize = 36;
+
+    const DIV_RAND2_OFFSET: usize = 13;
+    const DIV_QUOT_OFFSET: usize = 26;
+    const DIV_REM_OFFSET: usize = 39;
 
     const CMP_RAND2_OFFSET: usize = 27;
 
@@ -91,6 +96,20 @@ impl Instruction {
         let src2 = (operands >> Self::MULT_RAND2_OFFSET) as u8;
         let dest = (operands >> Self::MULT_DEST_OFFSET) as u8;
         Instruction::Mult { src1, src2, dest }
+    }
+
+    /*
+     * DIV
+     *
+     *       REM              QUOT          SRC2          SRC1       OPCODE
+     * 0b000000000000000_0000000000000_0000000000000_0000000000000(_0000000000)
+     */
+    fn parse_div(operands: u64) -> Self {
+        let src1 = operands as u8;
+        let src2 = (operands >> Self::DIV_RAND2_OFFSET) as u8;
+        let quot_dest = (operands >> Self::DIV_QUOT_OFFSET) as u8;
+        let rem_dest =  (operands >> Self::DIV_REM_OFFSET) as u8;
+        Instruction::Div { src1, src2, quot_dest, rem_dest }
     }
 
     /*
@@ -172,6 +191,7 @@ impl From<Word> for Instruction {
             8             => Self::parse_jneq(operands),
             9             => Self::parse_jgt(operands),
             10            => Self::parse_jlt(operands),
+            11            => Self::parse_div(operands),
             x if x > 1024 => Instruction::Illegal, // we have only 2.pow(10) = 1024 opcode slots
             _             => Instruction::Illegal              // for still unimplemented instructions
         }

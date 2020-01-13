@@ -42,18 +42,19 @@ impl Clockwork {
         let instruction = &self.fetch_next_instr();
 
         match Instruction::from(*instruction) {
-            Instruction::Illegal                    => panic!("Illegal opcode"),
-            Instruction::Halt                       => false,
-            Instruction::Load { value, dest_reg }   => self.perform_load(value, dest_reg),
-            Instruction::Add { src1, src2, dest }   => self.perform_add(src1, src2, dest),
-            Instruction::Sub { src1, src2, dest }   => self.perform_sub(src1, src2, dest),
-            Instruction::Mult { src1, src2, dest }  => self.perform_mult(src1, src2, dest),
-            Instruction::Cmp { src1, src2 }         => self.perform_cmp(src1, src2),
-            Instruction::Jmp { src }                => self.perform_jmp(src),
-            Instruction::Jeq { src }                => self.perform_jeq(src),
-            Instruction::Jneq { src }               => self.perform_jneq(src),
-            Instruction::Jgt { src }                => self.perform_jgt(src),
-            Instruction::Jlt { src }                => self.perform_jlt(src),
+            Instruction::Illegal                                  => panic!("Illegal opcode"),
+            Instruction::Halt                                     => false,
+            Instruction::Load { value, dest_reg }                 => self.perform_load(value, dest_reg),
+            Instruction::Add { src1, src2, dest }                 => self.perform_add(src1, src2, dest),
+            Instruction::Sub { src1, src2, dest }                 => self.perform_sub(src1, src2, dest),
+            Instruction::Mult { src1, src2, dest }                => self.perform_mult(src1, src2, dest),
+            Instruction::Div { src1, src2, quot_dest, rem_dest }  => self.perform_div(src1, src2, quot_dest, rem_dest),
+            Instruction::Cmp { src1, src2 }                       => self.perform_cmp(src1, src2),
+            Instruction::Jmp { src }                              => self.perform_jmp(src),
+            Instruction::Jeq { src }                              => self.perform_jeq(src),
+            Instruction::Jneq { src }                             => self.perform_jneq(src),
+            Instruction::Jgt { src }                              => self.perform_jgt(src),
+            Instruction::Jlt { src }                              => self.perform_jlt(src),
         }
     }
 
@@ -100,6 +101,19 @@ impl Clockwork {
             let v1 = self.registers[src1 as usize];
             let v2 = self.registers[src2 as usize];
             self.registers[dest as usize] = v1 * v2;
+            self.registers[Self::REG_F0] = 0;
+        } else {
+            self.registers[Self::REG_F0] = 1;
+        }
+        true
+    }
+
+    fn perform_div(&mut self, src1: u8, src2: u8, quot_dest: u8, rem_dest: u8) -> bool {
+        if Self::is_reg_writable(quot_dest as usize) && Self::is_reg_writable(rem_dest as usize) {
+            let v1 = self.registers[src1 as usize];
+            let v2 = self.registers[src2 as usize];
+            self.registers[quot_dest as usize] = v1 / v2;
+            self.registers[rem_dest as usize] = v1 % v2;
             self.registers[Self::REG_F0] = 0;
         } else {
             self.registers[Self::REG_F0] = 1;
@@ -350,6 +364,26 @@ mod tests {
         assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
         assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
         assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
+    }
+
+    #[test]
+    fn division_should_affect_both_quot_dest_and_rem_dest() {
+        let expected_quotient = 3;
+        let expected_remainder = 619;
+
+        let program = vec![
+            0b00000000_0000000000000000000000000000000001000011100001_0000000001u64,    // load $4321, d0
+            0b00000001_0000000000000000000000000000000000010011010010_0000000001u64,    // load $1234, d1
+            0b000000000000011_0000000000010_0000000000001_0000000000000_0000001011u64,  // div d0 d1 d2 d3
+        ];
+        let mut vm = Clockwork::new(program);
+
+        vm.step();  // load $4321, d0
+        vm.step();  // load $1234, d1
+        vm.step();  // div d0 d1 d2 d3
+
+        assert_eq!(expected_quotient, vm.registers[Clockwork::REG_D2]);
+        assert_eq!(expected_remainder, vm.registers[Clockwork::REG_D3]);
     }
 
     #[test]
