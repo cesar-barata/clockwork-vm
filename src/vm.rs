@@ -50,6 +50,10 @@ impl Clockwork {
             Instruction::Mult { src1, src2, dest }  => self.perform_mult(src1, src2, dest),
             Instruction::Cmp { src1, src2 }         => self.perform_cmp(src1, src2),
             Instruction::Jmp { src }                => self.perform_jmp(src),
+            Instruction::Jeq { src }                => self.perform_jeq(src),
+            Instruction::Jneq { src }               => self.perform_jneq(src),
+            Instruction::Jgt { src }                => self.perform_jgt(src),
+            Instruction::Jlt { src }                => self.perform_jlt(src),
         }
     }
 
@@ -106,13 +110,49 @@ impl Clockwork {
     fn perform_cmp(&mut self, src1: u8, src2: u8) ->  bool {
         let v1 =  self.registers[src1 as usize];
         let v2 =  self.registers[src2 as usize];
-        self.registers[Self::REG_F1] = if v1 == v2 { 1 } else { 0 };
+        self.registers[Self::REG_F1] = v1 - v2;
         true
     }
 
     fn perform_jmp(&mut self, src: u8) -> bool {
         let v = self.registers[src as usize];
         self.registers[Self::REG_IP] = v;
+        true
+    }
+
+    fn perform_jeq(&mut self, src: u8) -> bool {
+        let cmp = self.registers[Self::REG_F1];
+        if cmp == 0 {
+            let v = self.registers[src as usize];
+            self.registers[Self::REG_IP] = v;
+        }
+        true
+    }
+
+    fn perform_jneq(&mut self, src: u8) -> bool {
+        let cmp = self.registers[Self::REG_F1];
+        if cmp != 0 {
+            let v = self.registers[src as usize];
+            self.registers[Self::REG_IP] = v;
+        }
+        true
+    }
+
+    fn perform_jgt(&mut self, src: u8) -> bool {
+        let cmp = self.registers[Self::REG_F1];
+        if cmp > 0 {
+            let v = self.registers[src as usize];
+            self.registers[Self::REG_IP] = v;
+        }
+        true
+    }
+
+    fn perform_jlt(&mut self, src: u8) -> bool {
+        let cmp = self.registers[Self::REG_F1];
+        if cmp < 0 {
+            let v = self.registers[src as usize];
+            self.registers[Self::REG_IP] = v;
+        }
         true
     }
 }
@@ -315,26 +355,27 @@ mod tests {
     #[test]
     fn cmp_should_affect_f1_reg() {
         let program = vec![
-            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
-            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
-            0b00000010_0000000000000000000000000000000000011111010000_0000000001u64,
-            0b000000000000000000000000001_000000000000000000000000000_0000000101u64,
-            0b000000000000000000000000010_000000000000000000000000000_0000000101u64,
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,    // load $2000, d0
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,    // load $3000, d1
+            0b00000010_0000000000000000000000000000000000011111010000_0000000001u64,    // load $2000, d2
+            0b000000000000000000000000001_000000000000000000000000000_0000000101u64,    // cmp d0, d1
+            0b000000000000000000000000010_000000000000000000000000000_0000000101u64,    // cmp d0, d2
+            0b000000000000000000000000000_000000000000000000000000001_0000000101u64,    // cmp d1, d0
         ];
         let mut vm = Clockwork::new(program);
 
-        // perform the 3 loads
-        vm.step();
-        vm.step();
-        vm.step();
+        vm.step();  // load $2000, d0
+        vm.step();  // load $3000, d1
+        vm.step();  // load $2000, d2
 
-        // perform first comparison
-        vm.step();
+        vm.step();  // cmp d0, d1
+        assert!(vm.registers[Clockwork::REG_F1] < 0);
+
+        vm.step();  // cmp d0, d2
         assert_eq!(0, vm.registers[Clockwork::REG_F1]);
 
-        // perform second comparison
-        vm.step();
-        assert_eq!(1, vm.registers[Clockwork::REG_F1]);
+        vm.step();  // cmp d1, d0
+        assert!(vm.registers[Clockwork::REG_F1] > 0);
     }
 
     #[test]

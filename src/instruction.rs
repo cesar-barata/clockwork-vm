@@ -12,6 +12,10 @@ pub enum Instruction {
     Mult { src1: u8, src2: u8, dest: u8 },
     Cmp { src1: u8, src2: u8 },
     Jmp { src: u8 },
+    Jeq { src: u8 },
+    Jneq { src: u8 },
+    Jgt { src: u8 },
+    Jlt { src: u8 },
 }
 
 /*
@@ -110,6 +114,46 @@ impl Instruction {
     fn parse_jmp(operands: u64) -> Self {
         Instruction::Jmp { src: operands as u8 }
     }
+
+    /*
+     * JEQ
+     *
+     *                            SRC                               OPCODE
+     * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
+     */
+    fn parse_jeq(operands: u64) -> Self {
+        Instruction::Jeq { src: operands as u8 }
+    }
+
+    /*
+     * JNEQ
+     *
+     *                            SRC                               OPCODE
+     * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
+     */
+    fn parse_jneq(operands: u64) -> Self {
+        Instruction::Jneq { src: operands as u8 }
+    }
+
+    /*
+     * JGT
+     *
+     *                            SRC                               OPCODE
+     * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
+     */
+    fn parse_jgt(operands: u64) -> Self {
+        Instruction::Jgt { src: operands as u8 }
+    }
+
+    /*
+     * JLT
+     *
+     *                            SRC                               OPCODE
+     * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
+     */
+    fn parse_jlt(operands: u64) -> Self {
+        Instruction::Jlt { src: operands as u8 }
+    }
 }
 
 impl From<Word> for Instruction {
@@ -117,15 +161,19 @@ impl From<Word> for Instruction {
         let opcode = (instruction & Self::OPCODE_MASK) as u16;
         let operands = (instruction >> Self::OPCODE_OFFSET) as u64;
         match opcode {
-            0 => Instruction::Halt,
-            1 => Self::parse_load(operands),
-            2 => Self::parse_add(operands),
-            3 => Self::parse_sub(operands),
-            4 => Self::parse_mult(operands),
-            5 => Self::parse_cmp(operands),
-            6 => Self::parse_jmp(operands),
+            0             => Instruction::Halt,
+            1             => Self::parse_load(operands),
+            2             => Self::parse_add(operands),
+            3             => Self::parse_sub(operands),
+            4             => Self::parse_mult(operands),
+            5             => Self::parse_cmp(operands),
+            6             => Self::parse_jmp(operands),
+            7             => Self::parse_jeq(operands),
+            8             => Self::parse_jneq(operands),
+            9             => Self::parse_jgt(operands),
+            10            => Self::parse_jlt(operands),
             x if x > 1024 => Instruction::Illegal, // we have only 2.pow(10) = 1024 opcode slots
-            _ => Instruction::Illegal              // for still unimplemented instructions
+            _             => Instruction::Illegal              // for still unimplemented instructions
         }
     }
 }
