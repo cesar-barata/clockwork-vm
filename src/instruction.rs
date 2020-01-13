@@ -7,6 +7,7 @@ pub enum Instruction {
     Illegal,
     Halt,
     Load { value: Word, dest_reg: u8 },
+    Copy { src: u8, dest: u8 },
     Add { src1: u8, src2: u8, dest: u8 },
     Sub { src1: u8, src2: u8, dest: u8 },
     Mult { src1: u8, src2: u8, dest: u8 },
@@ -31,6 +32,8 @@ impl Instruction {
     const LOAD_RANDS_MASK: u64 = 0b00000000_1111111111111111111111111111111111111111111111;
     const LOAD_DEST_OFFSET: usize = 46;
 
+    const COPY_RAND2_OFFSET: usize = 27;
+
     const ADD_RAND2_OFFSET: usize = 18;
     const ADD_DEST_OFFSET: usize = 36;
 
@@ -49,14 +52,25 @@ impl Instruction {
     /*
      * LOAD
      *
-     *    DEST                         VALUE                         OPCODE
-     * 0b00000000_00000000000000000000000000000000000000000000000(_0000000000)
-     * 
+     *    DEST                        VALUE                         OPCODE
+     * 0b00000000_0000000000000000000000000000000000000000000000(_0000000000)
      */
     fn parse_load(operands: u64) -> Self {
         let value = (operands & Self::LOAD_RANDS_MASK) as u64;
         let dest_reg = (operands >> Self::LOAD_DEST_OFFSET) as u8;
         Instruction::Load { value, dest_reg }
+    }
+
+    /*
+     * COPY
+     *
+     *             DEST                          SRC                OPCODE
+     * 0b000000000000000000000000000_000000000000000000000000000(_0000000000)
+     */
+    fn parse_copy(operands: u64) -> Self {
+        let src = operands as u8;
+        let dest = (operands >> Self::COPY_RAND2_OFFSET) as u8;
+        Instruction::Copy { src, dest }
     }
 
     /*
@@ -192,6 +206,7 @@ impl From<Word> for Instruction {
             9             => Self::parse_jgt(operands),
             10            => Self::parse_jlt(operands),
             11            => Self::parse_div(operands),
+            12            => Self::parse_copy(operands),
             x if x > 1024 => Instruction::Illegal, // we have only 2.pow(10) = 1024 opcode slots
             _             => Instruction::Illegal              // for still unimplemented instructions
         }

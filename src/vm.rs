@@ -45,6 +45,7 @@ impl Clockwork {
             Instruction::Illegal                                  => panic!("Illegal opcode"),
             Instruction::Halt                                     => false,
             Instruction::Load { value, dest_reg }                 => self.perform_load(value, dest_reg),
+            Instruction::Copy { src, dest }                       => self.perform_copy(src, dest),
             Instruction::Add { src1, src2, dest }                 => self.perform_add(src1, src2, dest),
             Instruction::Sub { src1, src2, dest }                 => self.perform_sub(src1, src2, dest),
             Instruction::Mult { src1, src2, dest }                => self.perform_mult(src1, src2, dest),
@@ -65,6 +66,17 @@ impl Clockwork {
     fn perform_load(&mut self, value: u64, dest_reg: u8) -> bool {
         if Self::is_reg_writable(dest_reg as usize) {
             self.registers[dest_reg as usize] = value as i64;
+            self.registers[Self::REG_F0] = 0;
+        } else {
+            self.registers[Self::REG_F0] = 1;
+        }
+        true
+    }
+
+    fn perform_copy(&mut self, src: u8, dest: u8) -> bool {
+        if Self::is_reg_writable(dest as usize) {
+            let value = self.registers[src as usize];
+            self.registers[dest as usize] = value as i64;
             self.registers[Self::REG_F0] = 0;
         } else {
             self.registers[Self::REG_F0] = 1;
@@ -258,6 +270,26 @@ mod tests {
         assert_eq!(expected_d3, vm.registers[Clockwork::REG_D3]);
         assert_eq!(4, vm.registers[Clockwork::REG_IP]);
         assert_eq!(0, vm.registers[Clockwork::REG_F0]);
+    }
+
+    #[test]
+    fn copy_should_make_src_value_equal_to_dest_value() {
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000000000010001_0000000001u64,   // load $17, d0
+            0b000000000000000000000000001_000000000000000000000000000_0000001100u64,   // copy d0, d1
+        ];
+        let mut vm = Clockwork::new(program);
+
+        assert_eq!(0, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+
+        vm.step();  // load $17, d0
+        assert_eq!(17, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+
+        vm.step();  // copy d0, d1
+        assert_eq!(17, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(17, vm.registers[Clockwork::REG_D1]);
     }
 
     #[test]
