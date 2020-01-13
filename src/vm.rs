@@ -60,6 +60,7 @@ impl Clockwork {
     }
 
     pub fn run(&mut self) {
+        self.running = true;
         while self.running {
             self.running = self.step();
         }
@@ -130,6 +131,9 @@ impl Clockwork {
         if Self::is_reg_writable(quot_dest as usize) && Self::is_reg_writable(rem_dest as usize) {
             let v1 = self.registers[src1 as usize];
             let v2 = self.registers[src2 as usize];
+            if v2 == 0 {
+                todo!();
+            }
             self.registers[quot_dest as usize] = v1 / v2;
             self.registers[rem_dest as usize] = v1 % v2;
             self.registers[Self::REG_F0] = 0;
@@ -500,5 +504,26 @@ mod tests {
         assert_eq!(2, vm.registers[Clockwork::REG_IP]);
         assert_eq!(3, vm.registers[Clockwork::REG_D0]);
         assert_eq!(1, vm.registers[Clockwork::REG_D1]);
+    }
+
+    #[test]
+    fn euclidean_algorithm_gcd_of_230_449() {
+        let program = vec![
+            0b00000001_0000000000000000000000000000000000000011100110_0000000001u64,    // load $230, d1
+            0b00000000_0000000000000000000000000000000000000111000001_0000000001u64,    // load $449, d0
+            0b00000010_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d2
+            0b00000011_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d3
+            0b000000000000010_0000000000000_0000000000001_0000000000000_0000001011u64,  // div  d0 d1 d0 d2
+            0b000000000000000000000000000_000000000000000000000000001_0000001100u64,    // copy d1, d0
+            0b000000000000000000000000001_000000000000000000000000010_0000001100u64,    // copy d2, d1
+            0b000000000000000000000000011_000000000000000000000000001_0000000101u64,    // cmp  d1, d3
+            0b00000011_0000000000000000000000000000000000000000000010_0000000001u64,    // load $2, d3
+            0b000000000000000000000000000000000000000000000000000011_0000001000u64,     // jneq d3
+            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
+        ];
+        let mut vm = Clockwork::new(program);
+        vm.run();
+
+        assert_eq!(1, vm.registers[Clockwork::REG_D0]);
     }
 }
