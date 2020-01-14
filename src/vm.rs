@@ -20,7 +20,6 @@ impl Clockwork {
     const REG_IP: usize    = 4;
     const REG_FLAGS: usize = 5;
 
-    const FLAG_NO_MASK: i64    = 0x0000;
     const FLAG_ZERO_MASK: i64  = 0x0001;
     const FLAG_CARRY_MASK: i64 = 0x0002;
 
