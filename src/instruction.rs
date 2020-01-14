@@ -14,8 +14,8 @@ pub enum Instruction {
     Div { src1: u8, src2: u8, quot_dest: u8, rem_dest: u8 },
     Cmp { src1: u8, src2: u8 },
     Jmp { src: u8 },
-    Jeq { src: u8 },
-    Jneq { src: u8 },
+    Jz { src: u8 },
+    Jnz { src: u8 },
     Jgt { src: u8 },
     Jlt { src: u8 },
 }
@@ -149,23 +149,23 @@ impl Instruction {
     }
 
     /*
-     * JEQ
+     * JZ
      *
      *                            SRC                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_jeq(operands: u64) -> Self {
-        Instruction::Jeq { src: operands as u8 }
+    fn parse_jz(operands: u64) -> Self {
+        Instruction::Jz { src: operands as u8 }
     }
 
     /*
-     * JNEQ
+     * JNZ
      *
      *                            SRC                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_jneq(operands: u64) -> Self {
-        Instruction::Jneq { src: operands as u8 }
+    fn parse_jnz(operands: u64) -> Self {
+        Instruction::Jnz { src: operands as u8 }
     }
 
     /*
@@ -201,8 +201,8 @@ impl From<Word> for Instruction {
             4             => Self::parse_mult(operands),
             5             => Self::parse_cmp(operands),
             6             => Self::parse_jmp(operands),
-            7             => Self::parse_jeq(operands),
-            8             => Self::parse_jneq(operands),
+            7             => Self::parse_jz(operands),
+            8             => Self::parse_jnz(operands),
             9             => Self::parse_jgt(operands),
             10            => Self::parse_jlt(operands),
             11            => Self::parse_div(operands),

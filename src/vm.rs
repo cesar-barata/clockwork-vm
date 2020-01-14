@@ -10,22 +10,25 @@ pub struct Clockwork {
 }
 
 impl Clockwork {
-    const NUM_REGS: usize = 7;
+    const NUM_REGS: usize = 6;
     //const MEMORY_SIZE: usize = 1024;
 
-    const REG_D0: usize = 0;
-    const REG_D1: usize = 1;
-    const REG_D2: usize = 2;
-    const REG_D3: usize = 3;
-    const REG_IP: usize = 4;
-    const REG_F0: usize = 5;
-    const REG_F1: usize = 6;
+    const REG_D0: usize    = 0;
+    const REG_D1: usize    = 1;
+    const REG_D2: usize    = 2;
+    const REG_D3: usize    = 3;
+    const REG_IP: usize    = 4;
+    const REG_FLAGS: usize = 5;
 
-    const INITIAL_IP: usize = 0;
+    const FLAG_NO_MASK: i64    = 0x0000;
+    const FLAG_ZERO_MASK: i64  = 0x0001;
+    const FLAG_CARRY_MASK: i64 = 0x0002;
+
+    const INITIAL_IP: i64 = 0;
 
     pub fn new(program: Vec<Word>) -> Self {
         Clockwork {
-            registers: [0, 0, 0, 0, Self::INITIAL_IP as i64, 0, 0],
+            registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
             //memory: [0; MEMORY_SIZE],
             program,
             running: false
@@ -52,8 +55,8 @@ impl Clockwork {
             Instruction::Div { src1, src2, quot_dest, rem_dest }  => self.perform_div(src1, src2, quot_dest, rem_dest),
             Instruction::Cmp { src1, src2 }                       => self.perform_cmp(src1, src2),
             Instruction::Jmp { src }                              => self.perform_jmp(src),
-            Instruction::Jeq { src }                              => self.perform_jeq(src),
-            Instruction::Jneq { src }                             => self.perform_jneq(src),
+            Instruction::Jz { src }                               => self.perform_jz(src),
+            Instruction::Jnz { src }                              => self.perform_jnz(src),
             Instruction::Jgt { src }                              => self.perform_jgt(src),
             Instruction::Jlt { src }                              => self.perform_jlt(src),
         }
@@ -66,16 +69,27 @@ impl Clockwork {
         }
     }
 
+    fn set_flag_on(&mut self, mask: i64) {
+        self.registers[Self::REG_FLAGS] |= mask;
+    }
+
+    fn set_flag_off(&mut self, mask: i64) {
+        self.registers[Self::REG_FLAGS] &= !mask;
+    }
+
+    fn is_flag_on(&self, mask: i64) -> bool {
+        self.registers[Self::REG_FLAGS] & mask != 0
+    }
+
     fn is_reg_writable(index: usize) -> bool {
-        index != Self::REG_F0 && index != Self::REG_F1
+        index != Self::REG_FLAGS
     }
 
     fn perform_load(&mut self, value: u64, dest_reg: u8) -> bool {
         if Self::is_reg_writable(dest_reg as usize) {
             self.registers[dest_reg as usize] = value as i64;
-            self.registers[Self::REG_F0] = 0;
         } else {
-            self.registers[Self::REG_F0] = 1;
+            todo!("attempt to write to invalid register");
         }
         true
     }
@@ -84,9 +98,8 @@ impl Clockwork {
         if Self::is_reg_writable(dest as usize) {
             let value = self.registers[src as usize];
             self.registers[dest as usize] = value as i64;
-            self.registers[Self::REG_F0] = 0;
         } else {
-            self.registers[Self::REG_F0] = 1;
+            todo!("attempt to write to invalid register");
         }
         true
     }
@@ -96,9 +109,8 @@ impl Clockwork {
             let v1 = self.registers[src1 as usize];
             let v2 = self.registers[src2 as usize];
             self.registers[dest as usize] = v1 + v2;
-            self.registers[Self::REG_F0] = 0;
         } else {
-            self.registers[Self::REG_F0] = 1;
+            todo!("attempt to write to invalid register");
         }
         true
     }
@@ -108,9 +120,8 @@ impl Clockwork {
             let v1 = self.registers[src1 as usize];
             let v2 = self.registers[src2 as usize];
             self.registers[dest as usize] = v1 - v2;
-            self.registers[Self::REG_F0] = 0;
         } else {
-            self.registers[Self::REG_F0] = 1;
+            todo!("attempt to write to invalid register");
         }
         true
     }
@@ -120,9 +131,8 @@ impl Clockwork {
             let v1 = self.registers[src1 as usize];
             let v2 = self.registers[src2 as usize];
             self.registers[dest as usize] = v1 * v2;
-            self.registers[Self::REG_F0] = 0;
         } else {
-            self.registers[Self::REG_F0] = 1;
+            todo!("attempt to write to invalid register");
         }
         true
     }
@@ -132,13 +142,12 @@ impl Clockwork {
             let v1 = self.registers[src1 as usize];
             let v2 = self.registers[src2 as usize];
             if v2 == 0 {
-                todo!();
+                todo!("division by zero");
             }
             self.registers[quot_dest as usize] = v1 / v2;
             self.registers[rem_dest as usize] = v1 % v2;
-            self.registers[Self::REG_F0] = 0;
         } else {
-            self.registers[Self::REG_F0] = 1;
+            todo!("attempt to write to invalid register");
         }
         true
     }
@@ -146,7 +155,18 @@ impl Clockwork {
     fn perform_cmp(&mut self, src1: u8, src2: u8) ->  bool {
         let v1 =  self.registers[src1 as usize];
         let v2 =  self.registers[src2 as usize];
-        self.registers[Self::REG_F1] = v1 - v2;
+        
+        if v1 == v2 {
+            self.set_flag_on(Self::FLAG_ZERO_MASK);
+            self.set_flag_off(Self::FLAG_CARRY_MASK);
+        } else {
+            self.set_flag_off(Self::FLAG_ZERO_MASK);
+        }
+
+        if v1 < v2 {
+            self.set_flag_on(Self::FLAG_CARRY_MASK);
+        }
+
         true
     }
 
@@ -156,18 +176,16 @@ impl Clockwork {
         true
     }
 
-    fn perform_jeq(&mut self, src: u8) -> bool {
-        let cmp = self.registers[Self::REG_F1];
-        if cmp == 0 {
+    fn perform_jz(&mut self, src: u8) -> bool {
+        if self.is_flag_on(Self::FLAG_ZERO_MASK) {
             let v = self.registers[src as usize];
             self.registers[Self::REG_IP] = v;
         }
         true
     }
 
-    fn perform_jneq(&mut self, src: u8) -> bool {
-        let cmp = self.registers[Self::REG_F1];
-        if cmp != 0 {
+    fn perform_jnz(&mut self, src: u8) -> bool {
+        if !self.is_flag_on(Self::FLAG_ZERO_MASK) {
             let v = self.registers[src as usize];
             self.registers[Self::REG_IP] = v;
         }
@@ -175,8 +193,7 @@ impl Clockwork {
     }
 
     fn perform_jgt(&mut self, src: u8) -> bool {
-        let cmp = self.registers[Self::REG_F1];
-        if cmp > 0 {
+        if !self.is_flag_on(Self::FLAG_CARRY_MASK) {
             let v = self.registers[src as usize];
             self.registers[Self::REG_IP] = v;
         }
@@ -184,8 +201,7 @@ impl Clockwork {
     }
 
     fn perform_jlt(&mut self, src: u8) -> bool {
-        let cmp = self.registers[Self::REG_F1];
-        if cmp < 0 {
+        if self.is_flag_on(Self::FLAG_CARRY_MASK) {
             let v = self.registers[src as usize];
             self.registers[Self::REG_IP] = v;
         }
@@ -205,8 +221,7 @@ mod tests {
             0i64,
             0i64,
             0i64,
-            Clockwork::INITIAL_IP as i64,
-            0i64,
+            Clockwork::INITIAL_IP,
             0i64,
         ]);
         assert_eq!(vm.running, false);
@@ -255,7 +270,6 @@ mod tests {
         assert_eq!(0, vm.registers[Clockwork::REG_D2]);
         assert_eq!(0, vm.registers[Clockwork::REG_D3]);
         assert_eq!(1, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(0, vm.registers[Clockwork::REG_F0]);
         
         vm.step();
         assert_eq!(expected_d0, vm.registers[Clockwork::REG_D0]);
@@ -263,7 +277,6 @@ mod tests {
         assert_eq!(0, vm.registers[Clockwork::REG_D2]);
         assert_eq!(0, vm.registers[Clockwork::REG_D3]);
         assert_eq!(2, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(0, vm.registers[Clockwork::REG_F0]);
         
         vm.step();
         assert_eq!(expected_d0, vm.registers[Clockwork::REG_D0]);
@@ -271,7 +284,6 @@ mod tests {
         assert_eq!(expected_d2, vm.registers[Clockwork::REG_D2]);
         assert_eq!(0, vm.registers[Clockwork::REG_D3]);
         assert_eq!(3, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(0, vm.registers[Clockwork::REG_F0]);
         
         vm.step();
         assert_eq!(expected_d0, vm.registers[Clockwork::REG_D0]);
@@ -279,7 +291,6 @@ mod tests {
         assert_eq!(expected_d2, vm.registers[Clockwork::REG_D2]);
         assert_eq!(expected_d3, vm.registers[Clockwork::REG_D3]);
         assert_eq!(4, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(0, vm.registers[Clockwork::REG_F0]);
     }
 
     #[test]
@@ -300,22 +311,6 @@ mod tests {
         vm.step();  // copy d0, d1
         assert_eq!(17, vm.registers[Clockwork::REG_D0]);
         assert_eq!(17, vm.registers[Clockwork::REG_D1]);
-    }
-
-    #[test]
-    fn shouldnt_write_to_read_only_regs() {
-        let expected_f0 = 1;
-
-        /*
-         * Tries to load the number 5 to register f0
-         */
-        let program = vec![
-            0b00000101_0000000000000000000000000000000000000000001101_0000000001u64
-        ];
-        let mut vm = Clockwork::new(program);
-
-        vm.step();
-        assert_eq!(expected_f0, vm.registers[Clockwork::REG_F0]);
     }
 
     #[test]
@@ -429,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn cmp_should_affect_f1_reg() {
+    fn cmp_should_affect_zero_flag() {
         let program = vec![
             0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,    // load $2000, d0
             0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,    // load $3000, d1
@@ -445,13 +440,13 @@ mod tests {
         vm.step();  // load $2000, d2
 
         vm.step();  // cmp d0, d1
-        assert!(vm.registers[Clockwork::REG_F1] < 0);
+        assert!(!vm.is_flag_on(Clockwork::FLAG_ZERO_MASK));
 
         vm.step();  // cmp d0, d2
-        assert_eq!(0, vm.registers[Clockwork::REG_F1]);
+        assert!(vm.is_flag_on(Clockwork::FLAG_ZERO_MASK));
 
         vm.step();  // cmp d1, d0
-        assert!(vm.registers[Clockwork::REG_F1] > 0);
+        assert!(!vm.is_flag_on(Clockwork::FLAG_ZERO_MASK));
     }
 
     #[test]
@@ -509,17 +504,17 @@ mod tests {
     #[test]
     fn euclidean_algorithm_gcd_of_230_449() {
         let program = vec![
-            0b00000001_0000000000000000000000000000000000000011100110_0000000001u64,    // load $230, d1
-            0b00000000_0000000000000000000000000000000000000111000001_0000000001u64,    // load $449, d0
-            0b00000010_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d2
-            0b00000011_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d3
-            0b000000000000010_0000000000000_0000000000001_0000000000000_0000001011u64,  // div  d0 d1 d0 d2
-            0b000000000000000000000000000_000000000000000000000000001_0000001100u64,    // copy d1, d0
-            0b000000000000000000000000001_000000000000000000000000010_0000001100u64,    // copy d2, d1
-            0b000000000000000000000000011_000000000000000000000000001_0000000101u64,    // cmp  d1, d3
-            0b00000011_0000000000000000000000000000000000000000000010_0000000001u64,    // load $2, d3
-            0b000000000000000000000000000000000000000000000000000011_0000001000u64,     // jneq d3
-            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
+            0b00000001_0000000000000000000000000000000000000011100110_0000000001u64,    // load $230, d1     ; divisor
+            0b00000000_0000000000000000000000000000000000000111000001_0000000001u64,    // load $449, d0     ; dividend
+            0b00000010_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d2       ; clear remainder location
+            0b00000011_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d3       ; for zero comparison
+            0b000000000000010_0000000000000_0000000000001_0000000000000_0000001011u64,  // div  d0 d1 d0 d2  ; perform division
+            0b000000000000000000000000000_000000000000000000000000001_0000001100u64,    // copy d1, d0       ; divisor is the new dividend
+            0b000000000000000000000000001_000000000000000000000000010_0000001100u64,    // copy d2, d1       ; remainder is the new divisor
+            0b000000000000000000000000011_000000000000000000000000010_0000000101u64,    // cmp  d2, d3       ; check if remainder is zero
+            0b00000011_0000000000000000000000000000000000000000000010_0000000001u64,    // load $2, d3       ; load wanted ip value
+            0b000000000000000000000000000000000000000000000000000011_0000001000u64,     // jnz d3            ; jump back to step 2 (0-based)
+            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt              ; stop (result is in d0)
         ];
         let mut vm = Clockwork::new(program);
         vm.run();
