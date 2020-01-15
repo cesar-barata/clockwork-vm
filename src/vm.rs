@@ -4,14 +4,14 @@ use crate::instruction::Instruction;
 
 pub struct VM {
     registers: [i64; Self::NUM_REGS],
-    //memory: [u64; MEMORY_SIZE],
+    memory: Vec<i64>,
     program: Vec<Word>,
     running: bool
 }
 
 impl VM {
     const NUM_REGS: usize = 6;
-    //const MEMORY_SIZE: usize = 1024;
+    const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
 
     const REG_D0: usize    = 0;
     const REG_D1: usize    = 1;
@@ -25,10 +25,19 @@ impl VM {
 
     const INITIAL_IP: i64 = 0;
 
+    pub fn new_with_memory_size(program: Vec<Word>, memory_size: usize) -> Self {
+        VM {
+            registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
+            memory: vec![0; memory_size / std::mem::size_of::<i64>()],
+            program,
+            running: false
+        }
+    }
+
     pub fn new(program: Vec<Word>) -> Self {
         VM {
             registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
-            //memory: [0; MEMORY_SIZE],
+            memory: vec![0; Self::DEFAULT_MEMORY_SIZE_BYTES / std::mem::size_of::<i64>()],
             program,
             running: false
         }
