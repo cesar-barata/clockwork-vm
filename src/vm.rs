@@ -2,14 +2,14 @@ pub type Word = u64;
 
 use crate::instruction::Instruction;
 
-pub struct Clockwork {
+pub struct VM {
     registers: [i64; Self::NUM_REGS],
     //memory: [u64; MEMORY_SIZE],
     program: Vec<Word>,
     running: bool
 }
 
-impl Clockwork {
+impl VM {
     const NUM_REGS: usize = 6;
     //const MEMORY_SIZE: usize = 1024;
 
@@ -26,7 +26,7 @@ impl Clockwork {
     const INITIAL_IP: i64 = 0;
 
     pub fn new(program: Vec<Word>) -> Self {
-        Clockwork {
+        VM {
             registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
             //memory: [0; MEMORY_SIZE],
             program,
@@ -230,13 +230,13 @@ mod tests {
 
     #[test]
     fn brand_new_vm_has_default_values() {
-        let vm = Clockwork::new(vec![0; 0]);
+        let vm = VM::new(vec![0; 0]);
         assert_eq!(vm.registers, [
             0i64,
             0i64,
             0i64,
             0i64,
-            Clockwork::INITIAL_IP,
+            VM::INITIAL_IP,
             0i64,
         ]);
         assert_eq!(vm.running, false);
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn fetching_next_instruction_consumes_previous_ones() {
         let program = vec![7, 8, 9];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
         let instruction = vm.fetch_next_instr();
         let expected = 7;
@@ -277,35 +277,35 @@ mod tests {
             0b00000011_0000000000000000000000000000000011001010010100_0000000001u64, // load $12948, d3
         ];
 
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
         
         vm.step();
-        assert_eq!(expected_d0, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D2]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
-        assert_eq!(1, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(expected_d0, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D2]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
+        assert_eq!(1, vm.registers[VM::REG_IP]);
         
         vm.step();
-        assert_eq!(expected_d0, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(expected_d1, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D2]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
-        assert_eq!(2, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(expected_d0, vm.registers[VM::REG_D0]);
+        assert_eq!(expected_d1, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D2]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
+        assert_eq!(2, vm.registers[VM::REG_IP]);
         
         vm.step();
-        assert_eq!(expected_d0, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(expected_d1, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(expected_d2, vm.registers[Clockwork::REG_D2]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
-        assert_eq!(3, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(expected_d0, vm.registers[VM::REG_D0]);
+        assert_eq!(expected_d1, vm.registers[VM::REG_D1]);
+        assert_eq!(expected_d2, vm.registers[VM::REG_D2]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
+        assert_eq!(3, vm.registers[VM::REG_IP]);
         
         vm.step();
-        assert_eq!(expected_d0, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(expected_d1, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(expected_d2, vm.registers[Clockwork::REG_D2]);
-        assert_eq!(expected_d3, vm.registers[Clockwork::REG_D3]);
-        assert_eq!(4, vm.registers[Clockwork::REG_IP]);
+        assert_eq!(expected_d0, vm.registers[VM::REG_D0]);
+        assert_eq!(expected_d1, vm.registers[VM::REG_D1]);
+        assert_eq!(expected_d2, vm.registers[VM::REG_D2]);
+        assert_eq!(expected_d3, vm.registers[VM::REG_D3]);
+        assert_eq!(4, vm.registers[VM::REG_IP]);
     }
 
     #[test]
@@ -314,18 +314,18 @@ mod tests {
             0b00000000_0000000000000000000000000000000000000000010001_0000000001u64,   // load $17, d0
             0b000000000000000000000000001_000000000000000000000000000_0000001100u64,   // copy d0, d1
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
-        assert_eq!(0, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
 
         vm.step();  // load $17, d0
-        assert_eq!(17, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(17, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
 
         vm.step();  // copy d0, d1
-        assert_eq!(17, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(17, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(17, vm.registers[VM::REG_D0]);
+        assert_eq!(17, vm.registers[VM::REG_D1]);
     }
 
     #[test]
@@ -340,22 +340,22 @@ mod tests {
             0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
             0b000000000000000011_000000000000000001_000000000000000000_0000000010u64
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
         
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
 
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[VM::REG_D1]);
+        assert_eq!(expected_result, vm.registers[VM::REG_D3]);
     }
 
     #[test]
@@ -370,22 +370,22 @@ mod tests {
             0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
             0b000000000000000011_000000000000000001_000000000000000000_0000000011u64
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
         
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
 
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[VM::REG_D1]);
+        assert_eq!(expected_result, vm.registers[VM::REG_D3]);
     }
 
     #[test]
@@ -400,22 +400,22 @@ mod tests {
             0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
             0b000000000000000011_000000000000000001_000000000000000000_0000000100u64
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
         
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[VM::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_D3]);
 
         vm.step();
-        assert_eq!(0b11111010000, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0b101110111000, vm.registers[Clockwork::REG_D1]);
-        assert_eq!(expected_result, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(0b11111010000, vm.registers[VM::REG_D0]);
+        assert_eq!(0b101110111000, vm.registers[VM::REG_D1]);
+        assert_eq!(expected_result, vm.registers[VM::REG_D3]);
     }
 
     #[test]
@@ -428,14 +428,14 @@ mod tests {
             0b00000001_0000000000000000000000000000000000010011010010_0000000001u64,    // load $1234, d1
             0b000000000000011_0000000000010_0000000000001_0000000000000_0000001011u64,  // div d0 d1 d2 d3
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
         vm.step();  // load $4321, d0
         vm.step();  // load $1234, d1
         vm.step();  // div d0 d1 d2 d3
 
-        assert_eq!(expected_quotient, vm.registers[Clockwork::REG_D2]);
-        assert_eq!(expected_remainder, vm.registers[Clockwork::REG_D3]);
+        assert_eq!(expected_quotient, vm.registers[VM::REG_D2]);
+        assert_eq!(expected_remainder, vm.registers[VM::REG_D3]);
     }
 
     #[test]
@@ -448,20 +448,20 @@ mod tests {
             0b000000000000000000000000010_000000000000000000000000000_0000000101u64,    // cmp d0, d2
             0b000000000000000000000000000_000000000000000000000000001_0000000101u64,    // cmp d1, d0
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
         vm.step();  // load $2000, d0
         vm.step();  // load $3000, d1
         vm.step();  // load $2000, d2
 
         vm.step();  // cmp d0, d1
-        assert!(!vm.is_flag_on(Clockwork::FLAG_ZERO_MASK));
+        assert!(!vm.is_flag_on(VM::FLAG_ZERO_MASK));
 
         vm.step();  // cmp d0, d2
-        assert!(vm.is_flag_on(Clockwork::FLAG_ZERO_MASK));
+        assert!(vm.is_flag_on(VM::FLAG_ZERO_MASK));
 
         vm.step();  // cmp d1, d0
-        assert!(!vm.is_flag_on(Clockwork::FLAG_ZERO_MASK));
+        assert!(!vm.is_flag_on(VM::FLAG_ZERO_MASK));
     }
 
     #[test]
@@ -473,47 +473,47 @@ mod tests {
             0b00000001_0000000000000000000000000000000000000000000001_0000000001u64,    // load $1, d1
             0b000000000000000000000000000000000000000000000000000001_0000000110u64,     // jmp d1
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
 
-        assert_eq!(0, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(0, vm.registers[VM::REG_IP]);
+        assert_eq!(0, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
         
         vm.step();  // load $4, d0
 
-        assert_eq!(1, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(4, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(1, vm.registers[VM::REG_IP]);
+        assert_eq!(4, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
         
         vm.step();  // load $3, d0
 
-        assert_eq!(2, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(3, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(2, vm.registers[VM::REG_IP]);
+        assert_eq!(3, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
         
         vm.step();  // load $2, d0
 
-        assert_eq!(3, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(2, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(0, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(3, vm.registers[VM::REG_IP]);
+        assert_eq!(2, vm.registers[VM::REG_D0]);
+        assert_eq!(0, vm.registers[VM::REG_D1]);
 
         vm.step();  // load $1, d1
         
-        assert_eq!(4, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(2, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(1, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(4, vm.registers[VM::REG_IP]);
+        assert_eq!(2, vm.registers[VM::REG_D0]);
+        assert_eq!(1, vm.registers[VM::REG_D1]);
 
         vm.step();  // jmp d1
 
-        assert_eq!(1, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(2, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(1, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(1, vm.registers[VM::REG_IP]);
+        assert_eq!(2, vm.registers[VM::REG_D0]);
+        assert_eq!(1, vm.registers[VM::REG_D1]);
 
         vm.step();  // load $3, d0
 
-        assert_eq!(2, vm.registers[Clockwork::REG_IP]);
-        assert_eq!(3, vm.registers[Clockwork::REG_D0]);
-        assert_eq!(1, vm.registers[Clockwork::REG_D1]);
+        assert_eq!(2, vm.registers[VM::REG_IP]);
+        assert_eq!(3, vm.registers[VM::REG_D0]);
+        assert_eq!(1, vm.registers[VM::REG_D1]);
     }
 
     #[test]
@@ -531,10 +531,10 @@ mod tests {
             0b000000000000000000000000000000000000000000000000000011_0000001000u64,     // jnz d3            ; jump back to step 2 (0-based)
             0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt              ; stop (result is in d0)
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
         vm.run();
 
-        assert_eq!(1, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(1, vm.registers[VM::REG_D0]);
     }
 
     #[test]
@@ -546,10 +546,10 @@ mod tests {
             0b000000000000000000000000000000000000000000000000000000_0000001101u64,     // inc d0
             0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
         vm.run();
 
-        assert_eq!(expected_value, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(expected_value, vm.registers[VM::REG_D0]);
     }
 
     #[test]
@@ -561,9 +561,9 @@ mod tests {
             0b000000000000000000000000000000000000000000000000000000_0000001110u64,     // dec d0
             0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
         ];
-        let mut vm = Clockwork::new(program);
+        let mut vm = VM::new(program);
         vm.run();
 
-        assert_eq!(expected_value, vm.registers[Clockwork::REG_D0]);
+        assert_eq!(expected_value, vm.registers[VM::REG_D0]);
     }
 }
