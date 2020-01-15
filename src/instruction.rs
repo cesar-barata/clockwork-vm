@@ -18,6 +18,8 @@ pub enum Instruction {
     Jnz { src: u8 },
     Jgt { src: u8 },
     Jlt { src: u8 },
+    Inc { dest: u8 },
+    Dec { dest: u8 },
 }
 
 /*
@@ -187,6 +189,26 @@ impl Instruction {
     fn parse_jlt(operands: u64) -> Self {
         Instruction::Jlt { src: operands as u8 }
     }
+
+    /*
+     * INC
+     *
+     *                           DEST                               OPCODE
+     * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
+     */
+    fn parse_inc(operands: u64) -> Self {
+        Instruction::Inc { dest: operands as u8 }
+    }
+
+    /*
+     * DEC
+     *
+     *                           DEST                               OPCODE
+     * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
+     */
+    fn parse_dec(operands: u64) -> Self {
+        Instruction::Dec { dest: operands as u8 }
+    }
 }
 
 impl From<Word> for Instruction {
@@ -207,6 +229,8 @@ impl From<Word> for Instruction {
             10            => Self::parse_jlt(operands),
             11            => Self::parse_div(operands),
             12            => Self::parse_copy(operands),
+            13            => Self::parse_inc(operands),
+            14            => Self::parse_dec(operands),
             x if x > 1024 => Instruction::Illegal, // we have only 2.pow(10) = 1024 opcode slots
             _             => Instruction::Illegal              // for still unimplemented instructions
         }

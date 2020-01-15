@@ -58,6 +58,8 @@ impl Clockwork {
             Instruction::Jnz { src }                              => self.perform_jnz(src),
             Instruction::Jgt { src }                              => self.perform_jgt(src),
             Instruction::Jlt { src }                              => self.perform_jlt(src),
+            Instruction::Inc { dest }                             => self.perform_inc(dest),
+            Instruction::Dec { dest }                             => self.perform_dec(dest),
         }
     }
 
@@ -203,6 +205,20 @@ impl Clockwork {
         if self.is_flag_on(Self::FLAG_CARRY_MASK) {
             let v = self.registers[src as usize];
             self.registers[Self::REG_IP] = v;
+        }
+        true
+    }
+
+    fn perform_inc(&mut self, dest: u8) -> bool {
+        if Self::is_reg_writable(dest as usize) {
+            self.registers[dest as usize] += 1;
+        }
+        true
+    }
+
+    fn perform_dec(&mut self, dest: u8) -> bool {
+        if Self::is_reg_writable(dest as usize) {
+            self.registers[dest as usize] -= 1;
         }
         true
     }
@@ -519,5 +535,35 @@ mod tests {
         vm.run();
 
         assert_eq!(1, vm.registers[Clockwork::REG_D0]);
+    }
+
+    #[test]
+    fn inc_should_increment_a_reg_by_one() {
+        let expected_value = 231;
+
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000000011100110_0000000001u64,    // load $230, d0
+            0b000000000000000000000000000000000000000000000000000000_0000001101u64,     // inc d0
+            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
+        ];
+        let mut vm = Clockwork::new(program);
+        vm.run();
+
+        assert_eq!(expected_value, vm.registers[Clockwork::REG_D0]);
+    }
+
+    #[test]
+    fn dec_should_decrement_a_reg_by_one() {
+        let expected_value = 448;
+
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000000111000001_0000000001u64,    // load $449, d0
+            0b000000000000000000000000000000000000000000000000000000_0000001110u64,     // dec d0
+            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
+        ];
+        let mut vm = Clockwork::new(program);
+        vm.run();
+
+        assert_eq!(expected_value, vm.registers[Clockwork::REG_D0]);
     }
 }
