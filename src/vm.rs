@@ -83,16 +83,16 @@ impl VM {
         }
     }
 
-    fn set_flag_on(&mut self, mask: i64) {
-        self.registers[Reg::Flags as usize] |= mask;
+    fn set_flag_on(&mut self, flag: Flag) {
+        self.registers[Reg::Flags as usize] |= flag as i64;
     }
 
-    fn set_flag_off(&mut self, mask: i64) {
-        self.registers[Reg::Flags as usize] &= !mask;
+    fn set_flag_off(&mut self, flag: Flag) {
+        self.registers[Reg::Flags as usize] &= !(flag as i64);
     }
 
-    fn is_flag_on(&self, mask: i64) -> bool {
-        self.registers[Reg::Flags as usize] & mask != 0
+    fn is_flag_on(&self, flag: Flag) -> bool {
+        self.registers[Reg::Flags as usize] & (flag as i64) != 0
     }
 
     fn is_reg_writable(index: usize) -> bool {
@@ -171,14 +171,14 @@ impl VM {
         let v2 =  self.registers[src2 as usize];
         
         if v1 == v2 {
-            self.set_flag_on(Flag::Zero as i64);
-            self.set_flag_off(Flag::Carry as i64);
+            self.set_flag_on(Flag::Zero);
+            self.set_flag_off(Flag::Carry);
         } else {
-            self.set_flag_off(Flag::Zero as i64);
+            self.set_flag_off(Flag::Zero);
         }
 
         if v1 < v2 {
-            self.set_flag_on(Flag::Carry as i64);
+            self.set_flag_on(Flag::Carry);
         }
 
         true
@@ -191,7 +191,7 @@ impl VM {
     }
 
     fn perform_jz(&mut self, src: u8) -> bool {
-        if self.is_flag_on(Flag::Zero as i64) {
+        if self.is_flag_on(Flag::Zero) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -199,7 +199,7 @@ impl VM {
     }
 
     fn perform_jnz(&mut self, src: u8) -> bool {
-        if !self.is_flag_on(Flag::Zero as i64) {
+        if !self.is_flag_on(Flag::Zero) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -207,7 +207,7 @@ impl VM {
     }
 
     fn perform_jgt(&mut self, src: u8) -> bool {
-        if !self.is_flag_on(Flag::Carry as i64) {
+        if !self.is_flag_on(Flag::Carry) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -215,7 +215,7 @@ impl VM {
     }
 
     fn perform_jlt(&mut self, src: u8) -> bool {
-        if self.is_flag_on(Flag::Carry as i64) {
+        if self.is_flag_on(Flag::Carry) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -468,13 +468,13 @@ mod tests {
         vm.step();  // load $2000, d2
 
         vm.step();  // cmp d0, d1
-        assert!(!vm.is_flag_on(Flag::Zero as i64));
+        assert!(!vm.is_flag_on(Flag::Zero));
 
         vm.step();  // cmp d0, d2
-        assert!(vm.is_flag_on(Flag::Zero as i64));
+        assert!(vm.is_flag_on(Flag::Zero));
 
         vm.step();  // cmp d1, d0
-        assert!(!vm.is_flag_on(Flag::Zero as i64));
+        assert!(!vm.is_flag_on(Flag::Zero));
     }
 
     #[test]
