@@ -18,12 +18,14 @@ enum Reg {
     Flags = 5
 }
 
+enum Flag {
+    Zero  = 0x0001,
+    Carry = 0x0002,
+}
+
 impl VM {
     const NUM_REGS: usize = 6;
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
-
-    const FLAG_ZERO_MASK: i64  = 0x0001;
-    const FLAG_CARRY_MASK: i64 = 0x0002;
 
     const INITIAL_IP: i64 = 0;
 
@@ -169,14 +171,14 @@ impl VM {
         let v2 =  self.registers[src2 as usize];
         
         if v1 == v2 {
-            self.set_flag_on(Self::FLAG_ZERO_MASK);
-            self.set_flag_off(Self::FLAG_CARRY_MASK);
+            self.set_flag_on(Flag::Zero as i64);
+            self.set_flag_off(Flag::Carry as i64);
         } else {
-            self.set_flag_off(Self::FLAG_ZERO_MASK);
+            self.set_flag_off(Flag::Zero as i64);
         }
 
         if v1 < v2 {
-            self.set_flag_on(Self::FLAG_CARRY_MASK);
+            self.set_flag_on(Flag::Carry as i64);
         }
 
         true
@@ -189,7 +191,7 @@ impl VM {
     }
 
     fn perform_jz(&mut self, src: u8) -> bool {
-        if self.is_flag_on(Self::FLAG_ZERO_MASK) {
+        if self.is_flag_on(Flag::Zero as i64) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -197,7 +199,7 @@ impl VM {
     }
 
     fn perform_jnz(&mut self, src: u8) -> bool {
-        if !self.is_flag_on(Self::FLAG_ZERO_MASK) {
+        if !self.is_flag_on(Flag::Zero as i64) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -205,7 +207,7 @@ impl VM {
     }
 
     fn perform_jgt(&mut self, src: u8) -> bool {
-        if !self.is_flag_on(Self::FLAG_CARRY_MASK) {
+        if !self.is_flag_on(Flag::Carry as i64) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -213,7 +215,7 @@ impl VM {
     }
 
     fn perform_jlt(&mut self, src: u8) -> bool {
-        if self.is_flag_on(Self::FLAG_CARRY_MASK) {
+        if self.is_flag_on(Flag::Carry as i64) {
             let v = self.registers[src as usize];
             self.registers[Reg::InstPointer as usize] = v;
         }
@@ -466,13 +468,13 @@ mod tests {
         vm.step();  // load $2000, d2
 
         vm.step();  // cmp d0, d1
-        assert!(!vm.is_flag_on(VM::FLAG_ZERO_MASK));
+        assert!(!vm.is_flag_on(Flag::Zero as i64));
 
         vm.step();  // cmp d0, d2
-        assert!(vm.is_flag_on(VM::FLAG_ZERO_MASK));
+        assert!(vm.is_flag_on(Flag::Zero as i64));
 
         vm.step();  // cmp d1, d0
-        assert!(!vm.is_flag_on(VM::FLAG_ZERO_MASK));
+        assert!(!vm.is_flag_on(Flag::Zero as i64));
     }
 
     #[test]
