@@ -29,9 +29,9 @@ pub enum Instruction {
  */
 impl Instruction {
     const OPCODE_OFFSET: usize = 10;
-    const OPCODE_MASK: u64 = 0b000000_1111111111;
+    const OPCODE_MASK: Word = 0b000000_1111111111;
 
-    const LOAD_RANDS_MASK: u64 = 0b00000000_1111111111111111111111111111111111111111111111;
+    const LOAD_RANDS_MASK: Word = 0b00000000_1111111111111111111111111111111111111111111111;
     const LOAD_DEST_OFFSET: usize = 46;
 
     const COPY_RAND2_OFFSET: usize = 27;
@@ -56,9 +56,10 @@ impl Instruction {
      *
      *    DEST                        VALUE                         OPCODE
      * 0b00000000_0000000000000000000000000000000000000000000000(_0000000000)
+     * 0x00_00_00_00_00_00_00_00
      */
-    fn parse_load(operands: u64) -> Self {
-        let value = (operands & Self::LOAD_RANDS_MASK) as u64;
+    fn parse_load(operands: Word) -> Self {
+        let value = (operands & Self::LOAD_RANDS_MASK) as Word;
         let dest_reg = (operands >> Self::LOAD_DEST_OFFSET) as u8;
         Instruction::Load { value, dest_reg }
     }
@@ -69,7 +70,7 @@ impl Instruction {
      *             DEST                          SRC                OPCODE
      * 0b000000000000000000000000000_000000000000000000000000000(_0000000000)
      */
-    fn parse_copy(operands: u64) -> Self {
+    fn parse_copy(operands: Word) -> Self {
         let src = operands as u8;
         let dest = (operands >> Self::COPY_RAND2_OFFSET) as u8;
         Instruction::Copy { src, dest }
@@ -81,7 +82,7 @@ impl Instruction {
      *          DEST               SRC2               SRC1           OPCODE
      * 0b000000000000000000_000000000000000000_000000000000000000(_0000000000)
      */
-    fn parse_add(operands: u64) -> Self {
+    fn parse_add(operands: Word) -> Self {
         let src1 = operands as u8;
         let src2 = (operands >> Self::ADD_RAND2_OFFSET) as u8;
         let dest = (operands >> Self::ADD_DEST_OFFSET) as u8;
@@ -94,7 +95,7 @@ impl Instruction {
      *          DEST               SRC2               SRC1           OPCODE
      * 0b000000000000000000_000000000000000000_000000000000000000(_0000000000)
      */
-    fn parse_sub(operands: u64) -> Self {
+    fn parse_sub(operands: Word) -> Self {
         let src1 = operands as u8;
         let src2 = (operands >> Self::SUB_RAND2_OFFSET) as u8;
         let dest = (operands >> Self::SUB_DEST_OFFSET) as u8;
@@ -107,7 +108,7 @@ impl Instruction {
      *          DEST               SRC2               SRC1           OPCODE
      * 0b000000000000000000_000000000000000000_000000000000000000(_0000000000)
      */
-    fn parse_mult(operands: u64) -> Self {
+    fn parse_mult(operands: Word) -> Self {
         let src1 = operands as u8;
         let src2 = (operands >> Self::MULT_RAND2_OFFSET) as u8;
         let dest = (operands >> Self::MULT_DEST_OFFSET) as u8;
@@ -120,7 +121,7 @@ impl Instruction {
      *       REM              QUOT          SRC2          SRC1       OPCODE
      * 0b000000000000000_0000000000000_0000000000000_0000000000000(_0000000000)
      */
-    fn parse_div(operands: u64) -> Self {
+    fn parse_div(operands: Word) -> Self {
         let src1 = operands as u8;
         let src2 = (operands >> Self::DIV_RAND2_OFFSET) as u8;
         let quot_dest = (operands >> Self::DIV_QUOT_OFFSET) as u8;
@@ -134,7 +135,7 @@ impl Instruction {
      *              SRC2                         SRC1                OPCODE
      * 0b000000000000000000000000000_000000000000000000000000000(_0000000000)
      */
-    fn parse_cmp(operands: u64) -> Self {
+    fn parse_cmp(operands: Word) -> Self {
         let src1 = operands as u8;
         let src2 = (operands >> Self::CMP_RAND2_OFFSET) as u8;
         Instruction::Cmp { src1, src2 }
@@ -146,7 +147,7 @@ impl Instruction {
      *                            SRC                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_jmp(operands: u64) -> Self {
+    fn parse_jmp(operands: Word) -> Self {
         Instruction::Jmp { src: operands as u8 }
     }
 
@@ -156,7 +157,7 @@ impl Instruction {
      *                            SRC                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_jz(operands: u64) -> Self {
+    fn parse_jz(operands: Word) -> Self {
         Instruction::Jz { src: operands as u8 }
     }
 
@@ -166,7 +167,7 @@ impl Instruction {
      *                            SRC                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_jnz(operands: u64) -> Self {
+    fn parse_jnz(operands: Word) -> Self {
         Instruction::Jnz { src: operands as u8 }
     }
 
@@ -176,7 +177,7 @@ impl Instruction {
      *                            SRC                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_jgt(operands: u64) -> Self {
+    fn parse_jgt(operands: Word) -> Self {
         Instruction::Jgt { src: operands as u8 }
     }
 
@@ -186,7 +187,7 @@ impl Instruction {
      *                            SRC                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_jlt(operands: u64) -> Self {
+    fn parse_jlt(operands: Word) -> Self {
         Instruction::Jlt { src: operands as u8 }
     }
 
@@ -196,7 +197,7 @@ impl Instruction {
      *                           DEST                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_inc(operands: u64) -> Self {
+    fn parse_inc(operands: Word) -> Self {
         Instruction::Inc { dest: operands as u8 }
     }
 
@@ -206,15 +207,15 @@ impl Instruction {
      *                           DEST                               OPCODE
      * 0b000000000000000000000000000000000000000000000000000000(_0000000000)
      */
-    fn parse_dec(operands: u64) -> Self {
+    fn parse_dec(operands: Word) -> Self {
         Instruction::Dec { dest: operands as u8 }
     }
 }
 
 impl From<Word> for Instruction {
     fn from(instruction: Word) -> Self {
-        let opcode = (instruction & Self::OPCODE_MASK) as u16;
-        let operands = (instruction >> Self::OPCODE_OFFSET) as u64;
+        let opcode = instruction & Self::OPCODE_MASK;
+        let operands = (instruction >> Self::OPCODE_OFFSET) as Word;
         match opcode {
             0             => Instruction::Halt,
             1             => Self::parse_load(operands),

@@ -1,21 +1,22 @@
-pub type Word = u64;
+pub type Word = i64;
 
 use crate::instruction::Instruction;
 
 pub struct VM {
-    registers: [i64; Self::NUM_REGS],
-    memory: Vec<i64>,
+    registers: [Word; NUM_REGS],
+    memory: Vec<Word>,
     program: Vec<Word>,
     running: bool
 }
 
+const NUM_REGS: usize = 6; // TODO: get this automatically by the number of variants on the "Reg" enum
 enum Reg {
-    Data0 = 0,
-    Data1 = 1,
-    Data2 = 2,
-    Data3 = 3,
-    InstPointer = 4,
-    Flags = 5
+    Data0       = 0x0000,
+    Data1       = 0x0001,
+    Data2       = 0x0002,
+    Data3       = 0x0003,
+    InstPointer = 0x0004,
+    Flags       = 0x0005
 }
 
 enum Flag {
@@ -24,30 +25,30 @@ enum Flag {
 }
 
 impl VM {
-    const NUM_REGS: usize = 6;
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
-
-    const INITIAL_IP: i64 = 0;
+    const INITIAL_IP: Word = 0;
 
     pub fn new_with_memory_size(program: Vec<Word>, memory_size: usize) -> Self {
+        let mem_vec_size = memory_size / std::mem::size_of::<Word>();
         VM {
             registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
-            memory: vec![0; memory_size / std::mem::size_of::<i64>()],
+            memory: vec![0; mem_vec_size],
             program,
             running: false
         }
     }
 
     pub fn new(program: Vec<Word>) -> Self {
+        let mem_vec_size = Self::DEFAULT_MEMORY_SIZE_BYTES / std::mem::size_of::<Word>();
         VM {
             registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
-            memory: vec![0; Self::DEFAULT_MEMORY_SIZE_BYTES / std::mem::size_of::<i64>()],
+            memory: vec![0; mem_vec_size],
             program,
             running: false
         }
     }
 
-    fn fetch_next_instr(&mut self) -> u64 {
+    fn fetch_next_instr(&mut self) -> Word {
         let instruction = self.program[self.registers[Reg::InstPointer as usize] as usize];
         self.registers[Reg::InstPointer as usize] += 1;
         instruction
@@ -84,24 +85,24 @@ impl VM {
     }
 
     fn set_flag_on(&mut self, flag: Flag) {
-        self.registers[Reg::Flags as usize] |= flag as i64;
+        self.registers[Reg::Flags as usize] |= flag as Word;
     }
 
     fn set_flag_off(&mut self, flag: Flag) {
-        self.registers[Reg::Flags as usize] &= !(flag as i64);
+        self.registers[Reg::Flags as usize] &= !(flag as Word);
     }
 
     fn is_flag_on(&self, flag: Flag) -> bool {
-        self.registers[Reg::Flags as usize] & (flag as i64) != 0
+        self.registers[Reg::Flags as usize] & (flag as Word) != 0
     }
 
     fn is_reg_writable(index: usize) -> bool {
         index != Reg::Flags as usize
     }
 
-    fn perform_load(&mut self, value: u64, dest_reg: u8) -> bool {
+    fn perform_load(&mut self, value: Word, dest_reg: u8) -> bool {
         if Self::is_reg_writable(dest_reg as usize) {
-            self.registers[dest_reg as usize] = value as i64;
+            self.registers[dest_reg as usize] = value as Word;
         } else {
             todo!("attempt to write to invalid register");
         }
@@ -111,7 +112,7 @@ impl VM {
     fn perform_copy(&mut self, src: u8, dest: u8) -> bool {
         if Self::is_reg_writable(dest as usize) {
             let value = self.registers[src as usize];
-            self.registers[dest as usize] = value as i64;
+            self.registers[dest as usize] = value as Word;
         } else {
             todo!("attempt to write to invalid register");
         }
@@ -284,10 +285,10 @@ mod tests {
          * Writes to d0, d1, d2, d3 at each step
          */
         let program = vec![
-            0b00000000_0000000000000000000000000000000000000000001101_0000000001u64, // load $13, d0
-            0b00000001_0000000000000000000000000000000000000001100100_0000000001u64, // load $100, d1
-            0b00000010_0000000000000000000000000000000000000001100001_0000000001u64, // load $99, d2
-            0b00000011_0000000000000000000000000000000011001010010100_0000000001u64, // load $12948, d3
+            0b00000000_0000000000000000000000000000000000000000001101_0000000001i64, // load $13, d0
+            0b00000001_0000000000000000000000000000000000000001100100_0000000001i64, // load $100, d1
+            0b00000010_0000000000000000000000000000000000000001100001_0000000001i64, // load $99, d2
+            0b00000011_0000000000000000000000000000000011001010010100_0000000001i64, // load $12948, d3
         ];
 
         let mut vm = VM::new(program);
@@ -324,8 +325,8 @@ mod tests {
     #[test]
     fn copy_should_make_src_value_equal_to_dest_value() {
         let program = vec![
-            0b00000000_0000000000000000000000000000000000000000010001_0000000001u64,   // load $17, d0
-            0b000000000000000000000000001_000000000000000000000000000_0000001100u64,   // copy d0, d1
+            0b00000000_0000000000000000000000000000000000000000010001_0000000001i64,   // load $17, d0
+            0b000000000000000000000000001_000000000000000000000000000_0000001100i64,   // copy d0, d1
         ];
         let mut vm = VM::new(program);
 
@@ -349,9 +350,9 @@ mod tests {
          * Loads 2000 and 3000 to d0 and d1 respectively, then performs addition with destination d3
          */
         let program = vec![
-            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
-            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
-            0b000000000000000011_000000000000000001_000000000000000000_0000000010u64
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001i64,
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001i64,
+            0b000000000000000011_000000000000000001_000000000000000000_0000000010i64
         ];
         let mut vm = VM::new(program);
 
@@ -379,9 +380,9 @@ mod tests {
          * Loads 2000 and 3000 to d0 and d1 respectively, then performs subtraction with destination d3
          */
         let program = vec![
-            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
-            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
-            0b000000000000000011_000000000000000001_000000000000000000_0000000011u64
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001i64,
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001i64,
+            0b000000000000000011_000000000000000001_000000000000000000_0000000011i64
         ];
         let mut vm = VM::new(program);
 
@@ -409,9 +410,9 @@ mod tests {
          * Loads 2000 and 3000 to d0 and d1 respectively, then performs multiplication with destination d3
          */
         let program = vec![
-            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,
-            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,
-            0b000000000000000011_000000000000000001_000000000000000000_0000000100u64
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001i64,
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001i64,
+            0b000000000000000011_000000000000000001_000000000000000000_0000000100i64
         ];
         let mut vm = VM::new(program);
 
@@ -437,9 +438,9 @@ mod tests {
         let expected_remainder = 619;
 
         let program = vec![
-            0b00000000_0000000000000000000000000000000001000011100001_0000000001u64,    // load $4321, d0
-            0b00000001_0000000000000000000000000000000000010011010010_0000000001u64,    // load $1234, d1
-            0b000000000000011_0000000000010_0000000000001_0000000000000_0000001011u64,  // div d0 d1 d2 d3
+            0b00000000_0000000000000000000000000000000001000011100001_0000000001i64,    // load $4321, d0
+            0b00000001_0000000000000000000000000000000000010011010010_0000000001i64,    // load $1234, d1
+            0b000000000000011_0000000000010_0000000000001_0000000000000_0000001011i64,  // div d0 d1 d2 d3
         ];
         let mut vm = VM::new(program);
 
@@ -454,12 +455,12 @@ mod tests {
     #[test]
     fn cmp_should_affect_zero_flag() {
         let program = vec![
-            0b00000000_0000000000000000000000000000000000011111010000_0000000001u64,    // load $2000, d0
-            0b00000001_0000000000000000000000000000000000101110111000_0000000001u64,    // load $3000, d1
-            0b00000010_0000000000000000000000000000000000011111010000_0000000001u64,    // load $2000, d2
-            0b000000000000000000000000001_000000000000000000000000000_0000000101u64,    // cmp d0, d1
-            0b000000000000000000000000010_000000000000000000000000000_0000000101u64,    // cmp d0, d2
-            0b000000000000000000000000000_000000000000000000000000001_0000000101u64,    // cmp d1, d0
+            0b00000000_0000000000000000000000000000000000011111010000_0000000001i64,    // load $2000, d0
+            0b00000001_0000000000000000000000000000000000101110111000_0000000001i64,    // load $3000, d1
+            0b00000010_0000000000000000000000000000000000011111010000_0000000001i64,    // load $2000, d2
+            0b000000000000000000000000001_000000000000000000000000000_0000000101i64,    // cmp d0, d1
+            0b000000000000000000000000010_000000000000000000000000000_0000000101i64,    // cmp d0, d2
+            0b000000000000000000000000000_000000000000000000000000001_0000000101i64,    // cmp d1, d0
         ];
         let mut vm = VM::new(program);
 
@@ -480,11 +481,11 @@ mod tests {
     #[test]
     fn jmp_should_affect_ip_reg() {
         let program = vec![
-            0b00000000_0000000000000000000000000000000000000000000100_0000000001u64,    // load $4, d0
-            0b00000000_0000000000000000000000000000000000000000000011_0000000001u64,    // load $3, d0
-            0b00000000_0000000000000000000000000000000000000000000010_0000000001u64,    // load $2, d0
-            0b00000001_0000000000000000000000000000000000000000000001_0000000001u64,    // load $1, d1
-            0b000000000000000000000000000000000000000000000000000001_0000000110u64,     // jmp d1
+            0b00000000_0000000000000000000000000000000000000000000100_0000000001i64,    // load $4, d0
+            0b00000000_0000000000000000000000000000000000000000000011_0000000001i64,    // load $3, d0
+            0b00000000_0000000000000000000000000000000000000000000010_0000000001i64,    // load $2, d0
+            0b00000001_0000000000000000000000000000000000000000000001_0000000001i64,    // load $1, d1
+            0b000000000000000000000000000000000000000000000000000001_0000000110i64,     // jmp d1
         ];
         let mut vm = VM::new(program);
 
@@ -532,17 +533,17 @@ mod tests {
     #[test]
     fn euclidean_algorithm_gcd_of_230_449() {
         let program = vec![
-            0b00000001_0000000000000000000000000000000000000011100110_0000000001u64,    // load $230, d1     ; divisor
-            0b00000000_0000000000000000000000000000000000000111000001_0000000001u64,    // load $449, d0     ; dividend
-            0b00000010_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d2       ; clear remainder location
-            0b00000011_0000000000000000000000000000000000000000000000_0000000001u64,    // load $0, d3       ; for zero comparison
-            0b000000000000010_0000000000000_0000000000001_0000000000000_0000001011u64,  // div  d0 d1 d0 d2  ; perform division
-            0b000000000000000000000000000_000000000000000000000000001_0000001100u64,    // copy d1, d0       ; divisor is the new dividend
-            0b000000000000000000000000001_000000000000000000000000010_0000001100u64,    // copy d2, d1       ; remainder is the new divisor
-            0b000000000000000000000000011_000000000000000000000000010_0000000101u64,    // cmp  d2, d3       ; check if remainder is zero
-            0b00000011_0000000000000000000000000000000000000000000010_0000000001u64,    // load $2, d3       ; load wanted ip value
-            0b000000000000000000000000000000000000000000000000000011_0000001000u64,     // jnz d3            ; jump back to step 2 (0-based)
-            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt              ; stop (result is in d0)
+            0b00000001_0000000000000000000000000000000000000011100110_0000000001i64,    // load $230, d1     ; divisor
+            0b00000000_0000000000000000000000000000000000000111000001_0000000001i64,    // load $449, d0     ; dividend
+            0b00000010_0000000000000000000000000000000000000000000000_0000000001i64,    // load $0, d2       ; clear remainder location
+            0b00000011_0000000000000000000000000000000000000000000000_0000000001i64,    // load $0, d3       ; for zero comparison
+            0b000000000000010_0000000000000_0000000000001_0000000000000_0000001011i64,  // div  d0 d1 d0 d2  ; perform division
+            0b000000000000000000000000000_000000000000000000000000001_0000001100i64,    // copy d1, d0       ; divisor is the new dividend
+            0b000000000000000000000000001_000000000000000000000000010_0000001100i64,    // copy d2, d1       ; remainder is the new divisor
+            0b000000000000000000000000011_000000000000000000000000010_0000000101i64,    // cmp  d2, d3       ; check if remainder is zero
+            0b00000011_0000000000000000000000000000000000000000000010_0000000001i64,    // load $2, d3       ; load wanted ip value
+            0b000000000000000000000000000000000000000000000000000011_0000001000i64,     // jnz d3            ; jump back to step 2 (0-based)
+            0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt              ; stop (result is in d0)
         ];
         let mut vm = VM::new(program);
         vm.run();
@@ -555,9 +556,9 @@ mod tests {
         let expected_value = 231;
 
         let program = vec![
-            0b00000000_0000000000000000000000000000000000000011100110_0000000001u64,    // load $230, d0
-            0b000000000000000000000000000000000000000000000000000000_0000001101u64,     // inc d0
-            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
+            0b00000000_0000000000000000000000000000000000000011100110_0000000001i64,    // load $230, d0
+            0b000000000000000000000000000000000000000000000000000000_0000001101i64,     // inc d0
+            0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt
         ];
         let mut vm = VM::new(program);
         vm.run();
@@ -570,9 +571,9 @@ mod tests {
         let expected_value = 448;
 
         let program = vec![
-            0b00000000_0000000000000000000000000000000000000111000001_0000000001u64,    // load $449, d0
-            0b000000000000000000000000000000000000000000000000000000_0000001110u64,     // dec d0
-            0b0000000000000000000000000000000000000000000000000000000000000000u64,      // halt
+            0b00000000_0000000000000000000000000000000000000111000001_0000000001i64,    // load $449, d0
+            0b000000000000000000000000000000000000000000000000000000_0000001110i64,     // dec d0
+            0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt
         ];
         let mut vm = VM::new(program);
         vm.run();
