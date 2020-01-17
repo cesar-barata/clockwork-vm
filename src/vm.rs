@@ -5,18 +5,20 @@ use crate::instruction::Instruction;
 pub struct VM {
     registers: [Word; NUM_REGS],
     memory: Vec<Word>,
-    program: Vec<Word>,
     running: bool
 }
 
-const NUM_REGS: usize = 6; // TODO: get this automatically by the number of variants on the "Reg" enum
+const NUM_REGS: usize = 9; // TODO: get this automatically by the number of variants on the "Reg" enum
 enum Reg {
-    Data0       = 0x0000,
-    Data1       = 0x0001,
-    Data2       = 0x0002,
-    Data3       = 0x0003,
-    InstPointer = 0x0004,
-    Flags       = 0x0005
+    Data0        = 0x0000,
+    Data1        = 0x0001,
+    Data2        = 0x0002,
+    Data3        = 0x0003,
+    InstPointer  = 0x0004,
+    Flags        = 0x0005,
+    CodeSegment  = 0x0006,
+    DataSegment  = 0x0007,
+    StackSegment = 0x0008,
 }
 
 enum Flag {
@@ -26,38 +28,58 @@ enum Flag {
 
 impl VM {
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
+    const DEFAULT_CS: Word = 0;
     const INITIAL_IP: Word = 0;
 
-    pub fn new_with_memory_size(program: Vec<Word>, memory_size: usize) -> Self {
-        let mem_vec_size = memory_size / std::mem::size_of::<Word>();
-        VM {
-            registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
-            memory: vec![0; mem_vec_size],
-            program,
-            running: false
+    fn init_registers() -> [Word; NUM_REGS] {
+        [0, 0, 0, 0, Self::INITIAL_IP, 0, Self::DEFAULT_CS, 0, 0]
+    }
+
+    fn is_reg_writable(index: usize) -> bool {
+        index != Reg::Flags as usize
+    }
+
+    fn init_memory(program: Vec<Word>, memory_vec_size: usize) -> Vec<Word> {
+        let mut memory = vec![0; memory_vec_size];
+        for (index, inst) in program.iter().enumerate() {
+            memory[Self::DEFAULT_CS as usize + index] = *inst;
         }
+        memory
+    }
+
+    pub fn new_with_memory_size(program: Vec<Word>, memory_size: usize) -> Self {
+        let program_size = program.len() as Word;
+        let mem_vec_size = memory_size / std::mem::size_of::<Word>();
+        let mut vm = VM {
+            registers: Self::init_registers(),
+            memory: Self::init_memory(program, mem_vec_size),
+            running: false
+        };
+        vm.registers[Reg::DataSegment as usize] = program_size;
+        vm
     }
 
     pub fn new(program: Vec<Word>) -> Self {
-        let mem_vec_size = Self::DEFAULT_MEMORY_SIZE_BYTES / std::mem::size_of::<Word>();
-        VM {
-            registers: [0, 0, 0, 0, Self::INITIAL_IP, 0],
-            memory: vec![0; mem_vec_size],
-            program,
-            running: false
-        }
+        Self::new_with_memory_size(program, Self::DEFAULT_MEMORY_SIZE_BYTES)
+    }
+
+    fn read_next_inst(&self) -> Word {
+        let current_cs = self.registers[Reg::CodeSegment as usize] as usize;
+        let current_ip = self.registers[Reg::InstPointer as usize] as usize;
+        let position = current_cs + current_ip;
+        self.memory[position]
     }
 
     fn fetch_next_instr(&mut self) -> Word {
-        let instruction = self.program[self.registers[Reg::InstPointer as usize] as usize];
+        let instruction = self.read_next_inst();
         self.registers[Reg::InstPointer as usize] += 1;
         instruction
     }
 
     fn step(&mut self) -> bool {
-        let instruction = &self.fetch_next_instr();
+        let instruction = self.fetch_next_instr();
 
-        match Instruction::from(*instruction) {
+        match Instruction::from(instruction) {
             Instruction::Illegal                                  => panic!("Illegal opcode"),
             Instruction::Halt                                     => false,
             Instruction::Load { value, dest_reg }                 => self.perform_load(value, dest_reg),
@@ -94,10 +116,6 @@ impl VM {
 
     fn is_flag_on(&self, flag: Flag) -> bool {
         self.registers[Reg::Flags as usize] & (flag as Word) != 0
-    }
-
-    fn is_reg_writable(index: usize) -> bool {
-        index != Reg::Flags as usize
     }
 
     fn perform_load(&mut self, value: Word, dest_reg: u8) -> bool {
@@ -245,14 +263,7 @@ mod tests {
     #[test]
     fn brand_new_vm_has_default_values() {
         let vm = VM::new(vec![0; 0]);
-        assert_eq!(vm.registers, [
-            0i64,
-            0i64,
-            0i64,
-            0i64,
-            VM::INITIAL_IP,
-            0i64,
-        ]);
+        assert_eq!(vm.registers, VM::init_registers());
         assert_eq!(vm.running, false);
     }
 
@@ -414,6 +425,7 @@ mod tests {
             0b00000001_0000000000000000000000000000000000101110111000_0000000001i64,
             0b000000000000000011_000000000000000001_000000000000000000_0000000100i64
         ];
+
         let mut vm = VM::new(program);
 
         vm.step();
