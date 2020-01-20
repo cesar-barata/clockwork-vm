@@ -7,6 +7,8 @@ pub enum Instruction {
     Illegal,
     Halt,
     Load { value: Word, dest_reg: u8 },
+    LoadMem { src_addr: Word, dest_reg: u8 },
+    StoreMem { src_reg: u8, dest_addr: Word },
     Copy { src: u8, dest: u8 },
     Add { src1: u8, src2: u8, dest: u8 },
     Sub { src1: u8, src2: u8, dest: u8 },
@@ -50,6 +52,9 @@ impl Instruction {
     const DIV_REM_OFFSET: usize = 39;
 
     const CMP_RAND2_OFFSET: usize = 27;
+
+    const LOAD_MEM_DEST_OFFSET: usize = 27;
+    const STORE_MEM_DEST_OFFSET: usize = 27;
 
     /*
      * LOAD
@@ -210,6 +215,30 @@ impl Instruction {
     fn parse_dec(operands: Word) -> Self {
         Instruction::Dec { dest: operands as u8 }
     }
+
+    /*
+     * LDM
+     *
+     *             DEST                           SRC               OPCODE
+     * 0b000000000000000000000000000_000000000000000000000000000(_0000000000)
+     */
+    fn parse_load_mem(operands: Word) -> Self {
+        let src_addr = (operands as i16) as Word; // TODO: use bit mask to extract src_addr
+        let dest_reg = (operands >> Self::LOAD_MEM_DEST_OFFSET) as u8;
+        Instruction::LoadMem { src_addr, dest_reg }
+    }
+
+    /*
+     * STRM
+     *
+     *             DEST                           SRC               OPCODE
+     * 0b000000000000000000000000000_000000000000000000000000000(_0000000000)
+     */
+    fn parse_store_mem(operands: Word) -> Self {
+        let src_reg = operands as u8;
+        let dest_addr = (operands >> Self::STORE_MEM_DEST_OFFSET) as Word;
+        Instruction::StoreMem { src_reg, dest_addr }
+    }
 }
 
 impl From<Word> for Instruction {
@@ -232,6 +261,8 @@ impl From<Word> for Instruction {
             12            => Self::parse_copy(operands),
             13            => Self::parse_inc(operands),
             14            => Self::parse_dec(operands),
+            15            => Self::parse_load_mem(operands),
+            16            => Self::parse_store_mem(operands),
             x if x > 1024 => Instruction::Illegal, // we have only 2.pow(10) = 1024 opcode slots
             _             => Instruction::Illegal              // for still unimplemented instructions
         }

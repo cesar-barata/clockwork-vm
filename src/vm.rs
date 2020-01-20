@@ -26,14 +26,14 @@ enum Flag {
     Carry = 0x0002,
 }
 
+fn default_reg_values(program_size: Word) -> [Word; NUM_REGS] {
+    [0, 0, 0, 0, VM::INITIAL_IP, 0, VM::DEFAULT_CS, program_size, 0]
+}
+
 impl VM {
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
     const DEFAULT_CS: Word = 0;
     const INITIAL_IP: Word = 0;
-
-    fn init_registers() -> [Word; NUM_REGS] {
-        [0, 0, 0, 0, Self::INITIAL_IP, 0, Self::DEFAULT_CS, 0, 0]
-    }
 
     fn is_reg_writable(index: usize) -> bool {
         index != Reg::Flags as usize
@@ -50,13 +50,11 @@ impl VM {
     pub fn new_with_memory_size(program: Vec<Word>, memory_size: usize) -> Self {
         let program_size = program.len() as Word;
         let mem_vec_size = memory_size / std::mem::size_of::<Word>();
-        let mut vm = VM {
-            registers: Self::init_registers(),
+        VM {
+            registers: default_reg_values(program_size),
             memory: Self::init_memory(program, mem_vec_size),
             running: false
-        };
-        vm.registers[Reg::DataSegment as usize] = program_size;
-        vm
+        }
     }
 
     pub fn new(program: Vec<Word>) -> Self {
@@ -96,12 +94,16 @@ impl VM {
             Instruction::Jlt { src }                              => self.perform_jlt(src),
             Instruction::Inc { dest }                             => self.perform_inc(dest),
             Instruction::Dec { dest }                             => self.perform_dec(dest),
+            Instruction::LoadMem { src_addr, dest_reg }           => self.perform_load_mem(src_addr, dest_reg),
+            Instruction::StoreMem { src_reg, dest_addr }          => self.perform_store_mem(src_reg, dest_addr),
         }
     }
 
     pub fn run(&mut self) {
         self.running = true;
         while self.running {
+            println!("reg: {:?}", self.registers);
+            println!("mem: {:?}", self.memory);
             self.running = self.step();
         }
     }
@@ -254,6 +256,20 @@ impl VM {
         }
         true
     }
+
+    fn perform_load_mem(&mut self, src_addr: Word, dest_reg: u8) -> bool {
+        if Self::is_reg_writable(dest_reg as usize) {
+            let ds = self.registers[Reg::DataSegment as usize] as usize;
+            self.registers[dest_reg as usize] = self.memory[ds + src_addr as usize];
+        }
+        true
+    }
+
+    fn perform_store_mem(&mut self, src_reg: u8, dest_addr: Word) -> bool {
+        let ds = self.registers[Reg::DataSegment as usize] as usize;
+        self.memory[ds + dest_addr as usize] = self.registers[src_reg as usize];
+        true
+    }
 }
 
 #[cfg(test)]
@@ -262,8 +278,10 @@ mod tests {
 
     #[test]
     fn brand_new_vm_has_default_values() {
-        let vm = VM::new(vec![0; 0]);
-        assert_eq!(vm.registers, VM::init_registers());
+        let program = vec![0; 0];
+        let program_len = program.len();
+        let vm = VM::new(program);
+        assert_eq!(vm.registers, default_reg_values(program_len as Word));
         assert_eq!(vm.running, false);
     }
 
@@ -591,5 +609,33 @@ mod tests {
         vm.run();
 
         assert_eq!(expected_value, vm.registers[Reg::Data0 as usize]);
+    }
+
+    #[test]
+    fn storing_on_mem_affects_mem() {
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000000111000001_0000000001i64,    // load $449, d0
+            0b000000000000000000000000000_000000000000000000000000000_0000010000i64,    // strm d0, @0
+            0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt
+        ];
+        let mut vm = VM::new_with_memory_size(program, 50);
+        vm.run();
+
+        let ds = vm.registers[Reg::DataSegment as usize] as usize;
+        assert_eq!(449, vm.memory[ds]);
+    }
+
+    #[test]
+    fn loading_from_mem_affects_reg() {
+        let program = vec![
+            0b00000000_0000000000000000000000000000000000000111000001_0000000001i64,    // load $449, d0
+            0b000000000000000000000000000_000000000000000000000000000_0000010000i64,    // strm d0, @0
+            0b000000000000000000000000001_000000000000000000000000000_0000001111i64,    // ldm @0, d1
+            0b000000000000000000000000000000000000000000000000000000_0000000000i64,      // halt
+        ];
+        let mut vm = VM::new_with_memory_size(program, 50);
+        vm.run();
+
+        assert_eq!(449, vm.registers[Reg::Data1 as usize]);
     }
 }
