@@ -618,7 +618,7 @@ mod tests {
             0b000000000000000000000000000_000000000000000000000000000_0000010000i64,    // strm d0, @0
             0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt
         ];
-        let mut vm = VM::new_with_memory_size(program, 50);
+        let mut vm = VM::new(program);
         vm.run();
 
         let ds = vm.registers[Reg::DataSegment as usize] as usize;
@@ -633,7 +633,7 @@ mod tests {
             0b000000000000000000000000001_000000000000000000000000000_0000001111i64,    // ldm @0, d1
             0b000000000000000000000000000000000000000000000000000000_0000000000i64,      // halt
         ];
-        let mut vm = VM::new_with_memory_size(program, 50);
+        let mut vm = VM::new(program);
         vm.run();
 
         assert_eq!(449, vm.registers[Reg::Data1 as usize]);
