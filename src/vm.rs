@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn dec_should_decrement_a_reg_by_one() {
-        let expected_value = 448;
+        let expected_value = 448 - 5 + 5 -10 + 15 -5 + 1248 -8 -1100 -100 - 40;
 
         let program = vec![
             0b00000000_0000000000000000000000000000000000000111000001_0000000001i64,    // load $449, d0
