@@ -8,17 +8,14 @@ pub struct VM {
     running: bool
 }
 
-const NUM_REGS: usize = 9; // TODO: get this automatically by the number of variants on the "Reg" enum
+const NUM_REGS: usize = 6; // TODO: get this automatically by the number of variants on the "Reg" enum
 enum Reg {
     Data0        = 0x0000,
     Data1        = 0x0001,
     Data2        = 0x0002,
     Data3        = 0x0003,
     InstPointer  = 0x0004,
-    Flags        = 0x0005,
-    CodeSegment  = 0x0006,
-    DataSegment  = 0x0007,
-    StackSegment = 0x0008,
+    Flags        = 0x0005
 }
 
 enum Flag {
@@ -27,12 +24,11 @@ enum Flag {
 }
 
 fn default_reg_values(program_size: Word) -> [Word; NUM_REGS] {
-    [0, 0, 0, 0, VM::INITIAL_IP, 0, VM::DEFAULT_CS, program_size, 0]
+    [0, 0, 0, 0, VM::INITIAL_IP, 0]
 }
 
 impl VM {
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
-    const DEFAULT_CS: Word = 0;
     const INITIAL_IP: Word = 0;
 
     fn is_reg_writable(index: usize) -> bool {
@@ -42,7 +38,7 @@ impl VM {
     fn init_memory(program: Vec<Word>, memory_vec_size: usize) -> Vec<Word> {
         let mut memory = vec![0; memory_vec_size];
         for (index, inst) in program.iter().enumerate() {
-            memory[Self::DEFAULT_CS as usize + index] = *inst;
+            memory[index] = *inst;
         }
         memory
     }
@@ -62,10 +58,8 @@ impl VM {
     }
 
     fn read_next_inst(&self) -> Word {
-        let current_cs = self.registers[Reg::CodeSegment as usize] as usize;
         let current_ip = self.registers[Reg::InstPointer as usize] as usize;
-        let position = current_cs + current_ip;
-        self.memory[position]
+        self.memory[current_ip]
     }
 
     fn fetch_next_instr(&mut self) -> Word {
@@ -259,15 +253,13 @@ impl VM {
 
     fn perform_load_mem(&mut self, src_addr: Word, dest_reg: u8) -> bool {
         if Self::is_reg_writable(dest_reg as usize) {
-            let ds = self.registers[Reg::DataSegment as usize] as usize;
-            self.registers[dest_reg as usize] = self.memory[ds + src_addr as usize];
+            self.registers[dest_reg as usize] = self.memory[src_addr as usize];
         }
         true
     }
 
     fn perform_store_mem(&mut self, src_reg: u8, dest_addr: Word) -> bool {
-        let ds = self.registers[Reg::DataSegment as usize] as usize;
-        self.memory[ds + dest_addr as usize] = self.registers[src_reg as usize];
+        self.memory[dest_addr as usize] = self.registers[src_reg as usize];
         true
     }
 }
@@ -621,8 +613,7 @@ mod tests {
         let mut vm = VM::new(program);
         vm.run();
 
-        let ds = vm.registers[Reg::DataSegment as usize] as usize;
-        assert_eq!(449, vm.memory[ds]);
+        assert_eq!(449, vm.memory[0]);
     }
 
     #[test]
