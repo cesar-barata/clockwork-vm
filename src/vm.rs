@@ -2,50 +2,7 @@ pub type Word = i64;
 
 use crate::instruction::Instruction;
 use crate::error::{ Error, pair_result, Result };
-
-#[derive(Default)]
-struct Registers {
-    data0: Word,
-    data1: Word,
-    data2: Word,
-    data3: Word,
-    instr_pointer: Word,
-}
-
-impl Registers {
-    fn write(&mut self, index: usize, data: Word) -> Result<()> {
-        match index {
-            0 => {
-                self.data0 = data;
-                Ok(())
-            },
-            1 => {
-                self.data1 = data;
-                Ok(())
-            },
-            2 => {
-                self.data2 = data;
-                Ok(())
-            },
-            3 => {
-                self.data3 = data;
-                Ok(())
-            },
-            _ => Err(Error::InvalidRegister { number: index, instr_pointer: self.instr_pointer }),
-        }
-    }
-
-    fn read(&self, index: usize) -> Result<Word> {
-        match index {
-            0 => Ok(self.data0),
-            1 => Ok(self.data1),
-            2 => Ok(self.data2),
-            3 => Ok(self.data3),
-            4 => Ok(self.instr_pointer),
-            _ => Err(Error::InvalidRegister { number: index, instr_pointer: self.instr_pointer }),
-        }
-    }
-}
+use crate::registers::Registers;
 
 pub struct VM {
     registers: Registers,
