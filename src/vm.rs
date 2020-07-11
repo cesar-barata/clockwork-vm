@@ -1,6 +1,7 @@
 pub type Word = i64;
 
 use crate::instruction::Instruction;
+use crate::error::*;
 
 #[derive(Default)]
 struct Registers {
@@ -12,25 +13,36 @@ struct Registers {
 }
 
 impl Registers {
-    fn write(&mut self, index: usize, data: Word) {
+    fn write(&mut self, index: usize, data: Word) -> Result<()> {
         match index {
-            0 => self.data0 = data,
-            1 => self.data1 = data,
-            2 => self.data2 = data,
-            3 => self.data3 = data,
-            4 => self.instr_pointer = data,
-            _ => panic!("invalid register"),
+            0 => {
+                self.data0 = data;
+                Ok(())
+            },
+            1 => {
+                self.data1 = data;
+                Ok(())
+            },
+            2 => {
+                self.data2 = data;
+                Ok(())
+            },
+            3 => {
+                self.data3 = data;
+                Ok(())
+            },
+            _ => Err(Error::InvalidRegisterNumber { number: index, instr_pointer: self.instr_pointer }),
         }
     }
 
-    fn read(&self, index: usize) -> Word {
+    fn read(&self, index: usize) -> Result<Word> {
         match index {
-            0 => self.data0,
-            1 => self.data1,
-            2 => self.data2,
-            3 => self.data3,
-            4 => self.instr_pointer,
-            _ => panic!("invalid register"),
+            0 => Ok(self.data0),
+            1 => Ok(self.data1),
+            2 => Ok(self.data2),
+            3 => Ok(self.data3),
+            4 => Ok(self.instr_pointer),
+            _ => Err(Error::InvalidRegisterNumber { number: index, instr_pointer: self.instr_pointer }),
         }
     }
 }
@@ -83,9 +95,9 @@ impl VM {
     fn perform_next_instr(&mut self) -> bool {
         let instruction = self.consume_next_instr();
 
-        match Instruction::from(instruction) {
+        let result = match Instruction::from(instruction) {
             Instruction::Illegal                                  => panic!("Illegal opcode"),
-            Instruction::Halt                                     => false,
+            Instruction::Halt                                     => Err(Error::HaltSignal { instr_pointer: self.registers.instr_pointer }),
             Instruction::Load { value, dest_reg }                 => self.perform_load(value, dest_reg),
             Instruction::Copy { src, dest }                       => self.perform_copy(src, dest),
             Instruction::Add { src1, src2, dest }                 => self.perform_add(src1, src2, dest),
@@ -102,135 +114,135 @@ impl VM {
             Instruction::Dec { dest }                             => self.perform_dec(dest),
             Instruction::LoadMem { src_addr, dest_reg }           => self.perform_load_mem(src_addr, dest_reg),
             Instruction::StoreMem { src_reg, dest_addr }          => self.perform_store_mem(src_reg, dest_addr),
-        }
+        };
+
+        result.is_ok()
     }
 
     pub fn run(&mut self) {
         self.running = true;
         while self.running {
-            println!("mem: {:?}", self.memory);
             self.running = self.perform_next_instr();
         }
     }
 
-    fn perform_load(&mut self, value: Word, dest_reg: u8) -> bool {
-        self.registers.write(dest_reg as usize, value);
-        true
+    fn perform_load(&mut self, value: Word, dest_reg: u8) -> Result<()> {
+        self.registers
+            .write(dest_reg as usize, value)
     }
 
-    fn perform_copy(&mut self, src: u8, dest: u8) -> bool {
-        self.registers.write(dest as usize,self.registers.read(src as usize));
-        true
+    fn perform_copy(&mut self, src: u8, dest: u8) -> Result<()> {
+        self.registers
+            .read(src as usize)
+            .and_then(|value| self.registers.write(dest as usize, value))
     }
 
-    fn perform_add(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-        let v1 = self.registers.read(src1 as usize);
-        let v2 = self.registers.read(src2 as usize);
-        self.registers.write(dest as usize, v1 + v2);
-        true
+    fn perform_add(&mut self, src1: u8, src2: u8, dest: u8) -> Result<()> {
+        let res1 = self.registers.read(src1 as usize);
+        let res2 = self.registers.read(src2 as usize);
+        pair_result(res1, res2).and_then(|(v1, v2)| self.registers.write(dest as usize, v1 + v2))
     }
 
-    fn perform_sub(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-        let v1 = self.registers.read(src1 as usize);
-        let v2 = self.registers.read(src2 as usize);
-        self.registers.write(dest as usize, v1 - v2);
-        true
+    fn perform_sub(&mut self, src1: u8, src2: u8, dest: u8) -> Result<()> {
+        let res1 = self.registers.read(src1 as usize);
+        let res2 = self.registers.read(src2 as usize);
+        pair_result(res1, res2).and_then(|(v1, v2)| self.registers.write(dest as usize, v1 - v2))
     }
 
-    fn perform_mult(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-        let v1 = self.registers.read(src1 as usize);
-        let v2 = self.registers.read(src2 as usize);
-        self.registers.write(dest as usize, v1 * v2);
-        true
+    fn perform_mult(&mut self, src1: u8, src2: u8, dest: u8) -> Result<()> {
+        let res1 = self.registers.read(src1 as usize);
+        let res2 = self.registers.read(src2 as usize);
+        pair_result(res1, res2).and_then(|(v1, v2)| self.registers.write(dest as usize, v1 * v2))
     }
 
-    fn perform_div(&mut self, src1: u8, src2: u8, quot_dest: u8, rem_dest: u8) -> bool {
-        let v1 = self.registers.read(src1 as usize);
-        let v2 = self.registers.read(src2 as usize);
-        if v2 == 0 {
-            todo!("division by zero");
-        }
-        self.registers.write(quot_dest as usize, v1 / v2);
-        self.registers.write(rem_dest as usize, v1 % v2);
-        true
+    fn perform_div(&mut self, src1: u8, src2: u8, quot_dest: u8, rem_dest: u8) -> Result<()> {
+        let res1 = self.registers.read(src1 as usize);
+        let res2 = self.registers.read(src2 as usize);
+        pair_result(res1, res2).and_then(|(v1, v2)| {
+            if v2 == 0 {
+                return Err(Error::DivisionByZero { instr_pointer: self.registers.instr_pointer });
+            }
+            self.registers
+                .write(quot_dest as usize, v1 / v2)
+                .and_then(|()| self.registers.write(rem_dest as usize, v1 % v2))
+        })
     }
 
-    fn perform_cmp(&mut self, src1: u8, src2: u8) ->  bool {
-        let v1 =  self.registers.read(src1 as usize);
-        let v2 =  self.registers.read(src2 as usize);
-
-        if v1 == v2 {
-            self.flag_zero = true;
-            self.flag_carry = false;
-        } else {
-            self.flag_zero = false;
-        }
-
-        if v1 < v2 {
-            self.flag_carry = true;
-        }
-
-        true
+    fn perform_cmp(&mut self, src1: u8, src2: u8) -> Result<()> {
+        let res1 = self.registers.read(src1 as usize);
+        let res2 = self.registers.read(src2 as usize);
+        pair_result(res1, res2).map(|(v1, v2)| {
+            self.flag_zero = v1 == v2;
+            self.flag_carry = v1 < v2;
+        })
     }
 
-    fn perform_jmp(&mut self, src: u8) -> bool {
-        let v = self.registers.read(src as usize);
-        self.registers.instr_pointer = v;
-        true
+    fn perform_jmp(&mut self, src: u8) -> Result<()> {
+        self.registers
+            .read(src as usize)
+            .map(|v| self.registers.instr_pointer = v)
     }
 
-    fn perform_jz(&mut self, src: u8) -> bool {
+    fn perform_jz(&mut self, src: u8) -> Result<()> {
         if self.flag_zero {
-            let v = self.registers.read(src as usize);
-            self.registers.instr_pointer = v;
+            self.registers
+                .read(src as usize)
+                .map(|v| self.registers.instr_pointer = v)
+        } else {
+            Ok(())
         }
-        true
     }
 
-    fn perform_jnz(&mut self, src: u8) -> bool {
+    fn perform_jnz(&mut self, src: u8) -> Result<()> {
         if !self.flag_zero {
-            let v = self.registers.read(src as usize);
-            self.registers.instr_pointer = v;
+            self.registers
+                .read(src as usize)
+                .map(|v| self.registers.instr_pointer = v)
+        } else {
+            Ok(())
         }
-        true
     }
 
-    fn perform_jgt(&mut self, src: u8) -> bool {
+    fn perform_jgt(&mut self, src: u8) -> Result<()> {
         if !self.flag_carry {
-            let v = self.registers.read(src as usize);
-            self.registers.instr_pointer = v;
+            self.registers
+                .read(src as usize)
+                .map(|v| self.registers.instr_pointer = v)
+        } else {
+            Ok(())
         }
-        true
     }
 
-    fn perform_jlt(&mut self, src: u8) -> bool {
+    fn perform_jlt(&mut self, src: u8) -> Result<()> {
         if self.flag_carry {
-            let v = self.registers.read(src as usize);
-            self.registers.instr_pointer = v;
+            self.registers
+                .read(src as usize)
+                .map(|v| self.registers.instr_pointer = v)
+        } else {
+            Ok(())
         }
-        true
     }
 
-    fn perform_inc(&mut self, dest: u8) -> bool {
-        let current_value = self.registers.read(dest as usize);
-        self.registers.write(dest as usize, current_value + 1);
-        true
+    fn perform_inc(&mut self, dest: u8) -> Result<()> {
+        self.registers
+            .read(dest as usize)
+            .and_then(|current_value| self.registers.write(dest as usize, current_value + 1))
     }
 
-    fn perform_dec(&mut self, dest: u8) -> bool {
-        let current_value = self.registers.read(dest as usize);
-        self.registers.write(dest as usize, current_value - 1);
-        true
+    fn perform_dec(&mut self, dest: u8) -> Result<()> {
+        self.registers
+            .read(dest as usize)
+            .and_then(|current_value| self.registers.write(dest as usize, current_value - 1))
     }
 
-    fn perform_load_mem(&mut self, src_addr: Word, dest_reg: u8) -> bool {
-        self.registers.write(dest_reg as usize, self.memory[src_addr as usize]);
-        true
+    fn perform_load_mem(&mut self, src_addr: Word, dest_reg: u8) -> Result<()> {
+        self.registers.write(dest_reg as usize, self.memory[src_addr as usize])
     }
 
-    fn perform_store_mem(&mut self, src_reg: u8, dest_addr: Word) -> bool {
-        self.memory[dest_addr as usize] = self.registers.read(src_reg as usize);
-        true
+    fn perform_store_mem(&mut self, src_reg: u8, dest_addr: Word) -> Result<()> {
+        self.registers
+            .read(src_reg as usize)
+            .map(|value| self.memory[dest_addr as usize] = value)
     }
 }
 
