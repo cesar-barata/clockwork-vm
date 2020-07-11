@@ -2,38 +2,49 @@ pub type Word = i64;
 
 use crate::instruction::Instruction;
 
+#[derive(Default)]
+struct Registers {
+    data0: Word,
+    data1: Word,
+    data2: Word,
+    data3: Word,
+    instr_pointer: Word,
+}
+
+impl Registers {
+    fn write(&mut self, index: usize, data: Word) {
+        match index {
+            0 => self.data0 = data,
+            1 => self.data1 = data,
+            2 => self.data2 = data,
+            3 => self.data3 = data,
+            4 => self.instr_pointer = data,
+            _ => panic!("invalid register"),
+        }
+    }
+
+    fn read(&self, index: usize) -> Word {
+        match index {
+            0 => self.data0,
+            1 => self.data1,
+            2 => self.data2,
+            3 => self.data3,
+            4 => self.instr_pointer,
+            _ => panic!("invalid register"),
+        }
+    }
+}
+
 pub struct VM {
-    registers: [Word; NUM_REGS],
+    registers: Registers,
+    flag_zero: bool,
+    flag_carry: bool,
     memory: Vec<Word>,
     running: bool
 }
 
-const NUM_REGS: usize = 6; // TODO: get this automatically by the number of variants on the "Reg" enum
-enum Reg {
-    Data0        = 0x0000,
-    Data1        = 0x0001,
-    Data2        = 0x0002,
-    Data3        = 0x0003,
-    InstPointer  = 0x0004,
-    Flags        = 0x0005
-}
-
-enum Flag {
-    Zero  = 0x0001,
-    Carry = 0x0002,
-}
-
-fn default_reg_values(program_size: Word) -> [Word; NUM_REGS] {
-    [0, 0, 0, 0, VM::INITIAL_IP, 0]
-}
-
 impl VM {
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
-    const INITIAL_IP: Word = 0;
-
-    fn is_reg_writable(index: usize) -> bool {
-        index != Reg::Flags as usize
-    }
 
     fn init_memory(program: Vec<Word>, memory_vec_size: usize) -> Vec<Word> {
         let mut memory = vec![0; memory_vec_size];
@@ -44,10 +55,11 @@ impl VM {
     }
 
     pub fn new_with_memory_size(program: Vec<Word>, memory_size: usize) -> Self {
-        let program_size = program.len() as Word;
         let mem_vec_size = memory_size / std::mem::size_of::<Word>();
         VM {
-            registers: default_reg_values(program_size),
+            registers: Registers::default(),
+            flag_zero: false,
+            flag_carry: false,
             memory: Self::init_memory(program, mem_vec_size),
             running: false
         }
@@ -58,18 +70,18 @@ impl VM {
     }
 
     fn read_next_inst(&self) -> Word {
-        let current_ip = self.registers[Reg::InstPointer as usize] as usize;
+        let current_ip = self.registers.instr_pointer as usize;
         self.memory[current_ip]
     }
 
-    fn fetch_next_instr(&mut self) -> Word {
+    fn consume_next_instr(&mut self) -> Word {
         let instruction = self.read_next_inst();
-        self.registers[Reg::InstPointer as usize] += 1;
+        self.registers.instr_pointer += 1;
         instruction
     }
 
-    fn step(&mut self) -> bool {
-        let instruction = self.fetch_next_instr();
+    fn perform_next_instr(&mut self) -> bool {
+        let instruction = self.consume_next_instr();
 
         match Instruction::from(instruction) {
             Instruction::Illegal                                  => panic!("Illegal opcode"),
@@ -96,170 +108,128 @@ impl VM {
     pub fn run(&mut self) {
         self.running = true;
         while self.running {
-            println!("reg: {:?}", self.registers);
             println!("mem: {:?}", self.memory);
-            self.running = self.step();
+            self.running = self.perform_next_instr();
         }
-    }
-
-    fn set_flag_on(&mut self, flag: Flag) {
-        self.registers[Reg::Flags as usize] |= flag as Word;
-    }
-
-    fn set_flag_off(&mut self, flag: Flag) {
-        self.registers[Reg::Flags as usize] &= !(flag as Word);
-    }
-
-    fn is_flag_on(&self, flag: Flag) -> bool {
-        self.registers[Reg::Flags as usize] & (flag as Word) != 0
     }
 
     fn perform_load(&mut self, value: Word, dest_reg: u8) -> bool {
-        if Self::is_reg_writable(dest_reg as usize) {
-            self.registers[dest_reg as usize] = value as Word;
-        } else {
-            todo!("attempt to write to invalid register");
-        }
+        self.registers.write(dest_reg as usize, value);
         true
     }
 
     fn perform_copy(&mut self, src: u8, dest: u8) -> bool {
-        if Self::is_reg_writable(dest as usize) {
-            let value = self.registers[src as usize];
-            self.registers[dest as usize] = value as Word;
-        } else {
-            todo!("attempt to write to invalid register");
-        }
+        self.registers.write(dest as usize,self.registers.read(src as usize));
         true
     }
 
     fn perform_add(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-        if Self::is_reg_writable(dest as usize) {
-            let v1 = self.registers[src1 as usize];
-            let v2 = self.registers[src2 as usize];
-            self.registers[dest as usize] = v1 + v2;
-        } else {
-            todo!("attempt to write to invalid register");
-        }
+        let v1 = self.registers.read(src1 as usize);
+        let v2 = self.registers.read(src2 as usize);
+        self.registers.write(dest as usize, v1 + v2);
         true
     }
 
     fn perform_sub(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-        if Self::is_reg_writable(dest as usize) {
-            let v1 = self.registers[src1 as usize];
-            let v2 = self.registers[src2 as usize];
-            self.registers[dest as usize] = v1 - v2;
-        } else {
-            todo!("attempt to write to invalid register");
-        }
+        let v1 = self.registers.read(src1 as usize);
+        let v2 = self.registers.read(src2 as usize);
+        self.registers.write(dest as usize, v1 - v2);
         true
     }
 
     fn perform_mult(&mut self, src1: u8, src2: u8, dest: u8) -> bool {
-        if Self::is_reg_writable(dest as usize) {
-            let v1 = self.registers[src1 as usize];
-            let v2 = self.registers[src2 as usize];
-            self.registers[dest as usize] = v1 * v2;
-        } else {
-            todo!("attempt to write to invalid register");
-        }
+        let v1 = self.registers.read(src1 as usize);
+        let v2 = self.registers.read(src2 as usize);
+        self.registers.write(dest as usize, v1 * v2);
         true
     }
 
     fn perform_div(&mut self, src1: u8, src2: u8, quot_dest: u8, rem_dest: u8) -> bool {
-        if Self::is_reg_writable(quot_dest as usize) && Self::is_reg_writable(rem_dest as usize) {
-            let v1 = self.registers[src1 as usize];
-            let v2 = self.registers[src2 as usize];
-            if v2 == 0 {
-                todo!("division by zero");
-            }
-            self.registers[quot_dest as usize] = v1 / v2;
-            self.registers[rem_dest as usize] = v1 % v2;
-        } else {
-            todo!("attempt to write to invalid register");
+        let v1 = self.registers.read(src1 as usize);
+        let v2 = self.registers.read(src2 as usize);
+        if v2 == 0 {
+            todo!("division by zero");
         }
+        self.registers.write(quot_dest as usize, v1 / v2);
+        self.registers.write(rem_dest as usize, v1 % v2);
         true
     }
 
     fn perform_cmp(&mut self, src1: u8, src2: u8) ->  bool {
-        let v1 =  self.registers[src1 as usize];
-        let v2 =  self.registers[src2 as usize];
-        
+        let v1 =  self.registers.read(src1 as usize);
+        let v2 =  self.registers.read(src2 as usize);
+
         if v1 == v2 {
-            self.set_flag_on(Flag::Zero);
-            self.set_flag_off(Flag::Carry);
+            self.flag_zero = true;
+            self.flag_carry = false;
         } else {
-            self.set_flag_off(Flag::Zero);
+            self.flag_zero = false;
         }
 
         if v1 < v2 {
-            self.set_flag_on(Flag::Carry);
+            self.flag_carry = true;
         }
 
         true
     }
 
     fn perform_jmp(&mut self, src: u8) -> bool {
-        let v = self.registers[src as usize];
-        self.registers[Reg::InstPointer as usize] = v;
+        let v = self.registers.read(src as usize);
+        self.registers.instr_pointer = v;
         true
     }
 
     fn perform_jz(&mut self, src: u8) -> bool {
-        if self.is_flag_on(Flag::Zero) {
-            let v = self.registers[src as usize];
-            self.registers[Reg::InstPointer as usize] = v;
+        if self.flag_zero {
+            let v = self.registers.read(src as usize);
+            self.registers.instr_pointer = v;
         }
         true
     }
 
     fn perform_jnz(&mut self, src: u8) -> bool {
-        if !self.is_flag_on(Flag::Zero) {
-            let v = self.registers[src as usize];
-            self.registers[Reg::InstPointer as usize] = v;
+        if !self.flag_zero {
+            let v = self.registers.read(src as usize);
+            self.registers.instr_pointer = v;
         }
         true
     }
 
     fn perform_jgt(&mut self, src: u8) -> bool {
-        if !self.is_flag_on(Flag::Carry) {
-            let v = self.registers[src as usize];
-            self.registers[Reg::InstPointer as usize] = v;
+        if !self.flag_carry {
+            let v = self.registers.read(src as usize);
+            self.registers.instr_pointer = v;
         }
         true
     }
 
     fn perform_jlt(&mut self, src: u8) -> bool {
-        if self.is_flag_on(Flag::Carry) {
-            let v = self.registers[src as usize];
-            self.registers[Reg::InstPointer as usize] = v;
+        if self.flag_carry {
+            let v = self.registers.read(src as usize);
+            self.registers.instr_pointer = v;
         }
         true
     }
 
     fn perform_inc(&mut self, dest: u8) -> bool {
-        if Self::is_reg_writable(dest as usize) {
-            self.registers[dest as usize] += 1;
-        }
+        let current_value = self.registers.read(dest as usize);
+        self.registers.write(dest as usize, current_value + 1);
         true
     }
 
     fn perform_dec(&mut self, dest: u8) -> bool {
-        if Self::is_reg_writable(dest as usize) {
-            self.registers[dest as usize] -= 1;
-        }
+        let current_value = self.registers.read(dest as usize);
+        self.registers.write(dest as usize, current_value - 1);
         true
     }
 
     fn perform_load_mem(&mut self, src_addr: Word, dest_reg: u8) -> bool {
-        if Self::is_reg_writable(dest_reg as usize) {
-            self.registers[dest_reg as usize] = self.memory[src_addr as usize];
-        }
+        self.registers.write(dest_reg as usize, self.memory[src_addr as usize]);
         true
     }
 
     fn perform_store_mem(&mut self, src_reg: u8, dest_addr: Word) -> bool {
-        self.memory[dest_addr as usize] = self.registers[src_reg as usize];
+        self.memory[dest_addr as usize] = self.registers.read(src_reg as usize);
         true
     }
 }
@@ -271,9 +241,8 @@ mod tests {
     #[test]
     fn brand_new_vm_has_default_values() {
         let program = vec![0; 0];
-        let program_len = program.len();
         let vm = VM::new(program);
-        assert_eq!(vm.registers, default_reg_values(program_len as Word));
+        // assert_eq!(vm.old_registers, default_reg_values());
         assert_eq!(vm.running, false);
     }
 
@@ -282,15 +251,15 @@ mod tests {
         let program = vec![7, 8, 9];
         let mut vm = VM::new(program);
 
-        let instruction = vm.fetch_next_instr();
+        let instruction = vm.consume_next_instr();
         let expected = 7;
         assert_eq!(expected, instruction);
 
-        let instruction = vm.fetch_next_instr();
+        let instruction = vm.consume_next_instr();
         let expected = 8;
         assert_eq!(expected, instruction);
 
-        let instruction = vm.fetch_next_instr();
+        let instruction = vm.consume_next_instr();
         let expected = 9;
         assert_eq!(expected, instruction);
     }
@@ -301,7 +270,7 @@ mod tests {
         let expected_d1 = 0b0110_0100;
         let expected_d2 = 0b0110_0001;
         let expected_d3 = 0b0011_0010_1001_0100;
-        
+
         /*
          * Writes to d0, d1, d2, d3 at each step
          */
@@ -313,34 +282,34 @@ mod tests {
         ];
 
         let mut vm = VM::new(program);
-        
-        vm.step();
-        assert_eq!(expected_d0, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data2 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
-        assert_eq!(1, vm.registers[Reg::InstPointer as usize]);
-        
-        vm.step();
-        assert_eq!(expected_d0, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(expected_d1, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data2 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
-        assert_eq!(2, vm.registers[Reg::InstPointer as usize]);
-        
-        vm.step();
-        assert_eq!(expected_d0, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(expected_d1, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(expected_d2, vm.registers[Reg::Data2 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
-        assert_eq!(3, vm.registers[Reg::InstPointer as usize]);
-        
-        vm.step();
-        assert_eq!(expected_d0, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(expected_d1, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(expected_d2, vm.registers[Reg::Data2 as usize]);
-        assert_eq!(expected_d3, vm.registers[Reg::Data3 as usize]);
-        assert_eq!(4, vm.registers[Reg::InstPointer as usize]);
+
+        vm.perform_next_instr();
+        assert_eq!(expected_d0, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
+        assert_eq!(0, vm.registers.data2);
+        assert_eq!(0, vm.registers.data3);
+        assert_eq!(1, vm.registers.instr_pointer);
+
+        vm.perform_next_instr();
+        assert_eq!(expected_d0, vm.registers.data0);
+        assert_eq!(expected_d1, vm.registers.data1);
+        assert_eq!(0, vm.registers.data2);
+        assert_eq!(0, vm.registers.data3);
+        assert_eq!(2, vm.registers.instr_pointer);
+
+        vm.perform_next_instr();
+        assert_eq!(expected_d0, vm.registers.data0);
+        assert_eq!(expected_d1, vm.registers.data1);
+        assert_eq!(expected_d2, vm.registers.data2);
+        assert_eq!(0, vm.registers.data3);
+        assert_eq!(3, vm.registers.instr_pointer);
+
+        vm.perform_next_instr();
+        assert_eq!(expected_d0, vm.registers.data0);
+        assert_eq!(expected_d1, vm.registers.data1);
+        assert_eq!(expected_d2, vm.registers.data2);
+        assert_eq!(expected_d3, vm.registers.data3);
+        assert_eq!(4, vm.registers.instr_pointer);
     }
 
     #[test]
@@ -351,16 +320,16 @@ mod tests {
         ];
         let mut vm = VM::new(program);
 
-        assert_eq!(0, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
+        assert_eq!(0, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
 
-        vm.step();  // load $17, d0
-        assert_eq!(17, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
+        vm.perform_next_instr();  // load $17, d0
+        assert_eq!(17, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
 
-        vm.step();  // copy d0, d1
-        assert_eq!(17, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(17, vm.registers[Reg::Data1 as usize]);
+        vm.perform_next_instr();  // copy d0, d1
+        assert_eq!(17, vm.registers.data0);
+        assert_eq!(17, vm.registers.data1);
     }
 
     #[test]
@@ -377,20 +346,20 @@ mod tests {
         ];
         let mut vm = VM::new(program);
 
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
-        
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0b101110111000, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
+        assert_eq!(0, vm.registers.data3);
 
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0b101110111000, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(expected_result, vm.registers[Reg::Data3 as usize]);
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0b101110111000, vm.registers.data1);
+        assert_eq!(0, vm.registers.data3);
+
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0b101110111000, vm.registers.data1);
+        assert_eq!(expected_result, vm.registers.data3);
     }
 
     #[test]
@@ -407,20 +376,20 @@ mod tests {
         ];
         let mut vm = VM::new(program);
 
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
-        
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0b101110111000, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
+        assert_eq!(0, vm.registers.data3);
 
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0b101110111000, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(expected_result, vm.registers[Reg::Data3 as usize]);
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0b101110111000, vm.registers.data1);
+        assert_eq!(0, vm.registers.data3);
+
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0b101110111000, vm.registers.data1);
+        assert_eq!(expected_result, vm.registers.data3);
     }
 
     #[test]
@@ -438,20 +407,20 @@ mod tests {
 
         let mut vm = VM::new(program);
 
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
-        
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0b101110111000, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data3 as usize]);
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
+        assert_eq!(0, vm.registers.data3);
 
-        vm.step();
-        assert_eq!(0b11111010000, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0b101110111000, vm.registers[Reg::Data1 as usize]);
-        assert_eq!(expected_result, vm.registers[Reg::Data3 as usize]);
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0b101110111000, vm.registers.data1);
+        assert_eq!(0, vm.registers.data3);
+
+        vm.perform_next_instr();
+        assert_eq!(0b11111010000, vm.registers.data0);
+        assert_eq!(0b101110111000, vm.registers.data1);
+        assert_eq!(expected_result, vm.registers.data3);
     }
 
     #[test]
@@ -466,12 +435,12 @@ mod tests {
         ];
         let mut vm = VM::new(program);
 
-        vm.step();  // load $4321, d0
-        vm.step();  // load $1234, d1
-        vm.step();  // div d0 d1 d2 d3
+        vm.perform_next_instr();  // load $4321, d0
+        vm.perform_next_instr();  // load $1234, d1
+        vm.perform_next_instr();  // div d0 d1 d2 d3
 
-        assert_eq!(expected_quotient, vm.registers[Reg::Data2 as usize]);
-        assert_eq!(expected_remainder, vm.registers[Reg::Data3 as usize]);
+        assert_eq!(expected_quotient, vm.registers.data2);
+        assert_eq!(expected_remainder, vm.registers.data3);
     }
 
     #[test]
@@ -486,18 +455,18 @@ mod tests {
         ];
         let mut vm = VM::new(program);
 
-        vm.step();  // load $2000, d0
-        vm.step();  // load $3000, d1
-        vm.step();  // load $2000, d2
+        vm.perform_next_instr();  // load $2000, d0
+        vm.perform_next_instr();  // load $3000, d1
+        vm.perform_next_instr();  // load $2000, d2
 
-        vm.step();  // cmp d0, d1
-        assert!(!vm.is_flag_on(Flag::Zero));
+        vm.perform_next_instr();  // cmp d0, d1
+        assert!(!vm.flag_zero);
 
-        vm.step();  // cmp d0, d2
-        assert!(vm.is_flag_on(Flag::Zero));
+        vm.perform_next_instr();  // cmp d0, d2
+        assert!(vm.flag_zero);
 
-        vm.step();  // cmp d1, d0
-        assert!(!vm.is_flag_on(Flag::Zero));
+        vm.perform_next_instr();  // cmp d1, d0
+        assert!(!vm.flag_zero);
     }
 
     #[test]
@@ -511,45 +480,45 @@ mod tests {
         ];
         let mut vm = VM::new(program);
 
-        assert_eq!(0, vm.registers[Reg::InstPointer as usize]);
-        assert_eq!(0, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
-        
-        vm.step();  // load $4, d0
+        assert_eq!(0, vm.registers.instr_pointer);
+        assert_eq!(0, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
 
-        assert_eq!(1, vm.registers[Reg::InstPointer as usize]);
-        assert_eq!(4, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
-        
-        vm.step();  // load $3, d0
+        vm.perform_next_instr();  // load $4, d0
 
-        assert_eq!(2, vm.registers[Reg::InstPointer as usize]);
-        assert_eq!(3, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
-        
-        vm.step();  // load $2, d0
+        assert_eq!(1, vm.registers.instr_pointer);
+        assert_eq!(4, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
 
-        assert_eq!(3, vm.registers[Reg::InstPointer as usize]);
-        assert_eq!(2, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(0, vm.registers[Reg::Data1 as usize]);
+        vm.perform_next_instr();  // load $3, d0
 
-        vm.step();  // load $1, d1
-        
-        assert_eq!(4, vm.registers[Reg::InstPointer as usize]);
-        assert_eq!(2, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(1, vm.registers[Reg::Data1 as usize]);
+        assert_eq!(2, vm.registers.instr_pointer);
+        assert_eq!(3, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
 
-        vm.step();  // jmp d1
+        vm.perform_next_instr();  // load $2, d0
 
-        assert_eq!(1, vm.registers[Reg::InstPointer as usize]);
-        assert_eq!(2, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(1, vm.registers[Reg::Data1 as usize]);
+        assert_eq!(3, vm.registers.instr_pointer);
+        assert_eq!(2, vm.registers.data0);
+        assert_eq!(0, vm.registers.data1);
 
-        vm.step();  // load $3, d0
+        vm.perform_next_instr();  // load $1, d1
 
-        assert_eq!(2, vm.registers[Reg::InstPointer as usize]);
-        assert_eq!(3, vm.registers[Reg::Data0 as usize]);
-        assert_eq!(1, vm.registers[Reg::Data1 as usize]);
+        assert_eq!(4, vm.registers.instr_pointer);
+        assert_eq!(2, vm.registers.data0);
+        assert_eq!(1, vm.registers.data1);
+
+        vm.perform_next_instr();  // jmp d1
+
+        assert_eq!(1, vm.registers.instr_pointer);
+        assert_eq!(2, vm.registers.data0);
+        assert_eq!(1, vm.registers.data1);
+
+        vm.perform_next_instr();  // load $3, d0
+
+        assert_eq!(2, vm.registers.instr_pointer);
+        assert_eq!(3, vm.registers.data0);
+        assert_eq!(1, vm.registers.data1);
     }
 
     #[test]
@@ -569,8 +538,8 @@ mod tests {
         ];
         let mut vm = VM::new(program);
         vm.run();
-
-        assert_eq!(1, vm.registers[Reg::Data0 as usize]);
+    
+        assert_eq!(1, vm.registers.data0);
     }
 
     #[test]
@@ -585,7 +554,7 @@ mod tests {
         let mut vm = VM::new(program);
         vm.run();
 
-        assert_eq!(expected_value, vm.registers[Reg::Data0 as usize]);
+        assert_eq!(expected_value, vm.registers.data0);
     }
 
     #[test]
@@ -600,7 +569,7 @@ mod tests {
         let mut vm = VM::new(program);
         vm.run();
 
-        assert_eq!(expected_value, vm.registers[Reg::Data0 as usize]);
+        assert_eq!(expected_value, vm.registers.data0);
     }
 
     #[test]
@@ -627,6 +596,6 @@ mod tests {
         let mut vm = VM::new(program);
         vm.run();
 
-        assert_eq!(449, vm.registers[Reg::Data1 as usize]);
+        assert_eq!(449, vm.registers.data1);
     }
 }
