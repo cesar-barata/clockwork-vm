@@ -1,7 +1,7 @@
 pub type Word = i64;
 
 use crate::instruction::Instruction;
-use crate::error::*;
+use crate::error::{ Error, pair_result, Result };
 
 #[derive(Default)]
 struct Registers {
@@ -31,7 +31,7 @@ impl Registers {
                 self.data3 = data;
                 Ok(())
             },
-            _ => Err(Error::InvalidRegisterNumber { number: index, instr_pointer: self.instr_pointer }),
+            _ => Err(Error::InvalidRegister { number: index, instr_pointer: self.instr_pointer }),
         }
     }
 
@@ -42,7 +42,7 @@ impl Registers {
             2 => Ok(self.data2),
             3 => Ok(self.data3),
             4 => Ok(self.instr_pointer),
-            _ => Err(Error::InvalidRegisterNumber { number: index, instr_pointer: self.instr_pointer }),
+            _ => Err(Error::InvalidRegister { number: index, instr_pointer: self.instr_pointer }),
         }
     }
 }
@@ -95,28 +95,26 @@ impl VM {
     fn perform_next_instr(&mut self) -> bool {
         let instruction = self.consume_next_instr();
 
-        let result = match Instruction::from(instruction) {
-            Instruction::Illegal                                  => panic!("Illegal opcode"),
-            Instruction::Halt                                     => Err(Error::HaltSignal { instr_pointer: self.registers.instr_pointer }),
-            Instruction::Load { value, dest_reg }                 => self.perform_load(value, dest_reg),
-            Instruction::Copy { src, dest }                       => self.perform_copy(src, dest),
-            Instruction::Add { src1, src2, dest }                 => self.perform_add(src1, src2, dest),
-            Instruction::Sub { src1, src2, dest }                 => self.perform_sub(src1, src2, dest),
-            Instruction::Mult { src1, src2, dest }                => self.perform_mult(src1, src2, dest),
-            Instruction::Div { src1, src2, quot_dest, rem_dest }  => self.perform_div(src1, src2, quot_dest, rem_dest),
-            Instruction::Cmp { src1, src2 }                       => self.perform_cmp(src1, src2),
-            Instruction::Jmp { src }                              => self.perform_jmp(src),
-            Instruction::Jz { src }                               => self.perform_jz(src),
-            Instruction::Jnz { src }                              => self.perform_jnz(src),
-            Instruction::Jgt { src }                              => self.perform_jgt(src),
-            Instruction::Jlt { src }                              => self.perform_jlt(src),
-            Instruction::Inc { dest }                             => self.perform_inc(dest),
-            Instruction::Dec { dest }                             => self.perform_dec(dest),
-            Instruction::LoadMem { src_addr, dest_reg }           => self.perform_load_mem(src_addr, dest_reg),
-            Instruction::StoreMem { src_reg, dest_addr }          => self.perform_store_mem(src_reg, dest_addr),
-        };
-
-        result.is_ok()
+        match Instruction::from(instruction) {
+            Instruction::Illegal                                  => self.handle_illegal_opcode().is_ok(),
+            Instruction::Halt                                     => false,
+            Instruction::Load { value, dest_reg }                 => self.perform_load(value, dest_reg).is_ok(),
+            Instruction::Copy { src, dest }                       => self.perform_copy(src, dest).is_ok(),
+            Instruction::Add { src1, src2, dest }                 => self.perform_add(src1, src2, dest).is_ok(),
+            Instruction::Sub { src1, src2, dest }                 => self.perform_sub(src1, src2, dest).is_ok(),
+            Instruction::Mult { src1, src2, dest }                => self.perform_mult(src1, src2, dest).is_ok(),
+            Instruction::Div { src1, src2, quot_dest, rem_dest }  => self.perform_div(src1, src2, quot_dest, rem_dest).is_ok(),
+            Instruction::Cmp { src1, src2 }                       => self.perform_cmp(src1, src2).is_ok(),
+            Instruction::Jmp { src }                              => self.perform_jmp(src).is_ok(),
+            Instruction::Jz { src }                               => self.perform_jz(src).is_ok(),
+            Instruction::Jnz { src }                              => self.perform_jnz(src).is_ok(),
+            Instruction::Jgt { src }                              => self.perform_jgt(src).is_ok(),
+            Instruction::Jlt { src }                              => self.perform_jlt(src).is_ok(),
+            Instruction::Inc { dest }                             => self.perform_inc(dest).is_ok(),
+            Instruction::Dec { dest }                             => self.perform_dec(dest).is_ok(),
+            Instruction::LoadMem { src_addr, dest_reg }           => self.perform_load_mem(src_addr, dest_reg).is_ok(),
+            Instruction::StoreMem { src_reg, dest_addr }          => self.perform_store_mem(src_reg, dest_addr).is_ok(),
+        }
     }
 
     pub fn run(&mut self) {
@@ -125,6 +123,9 @@ impl VM {
             self.running = self.perform_next_instr();
         }
     }
+
+    fn handle_illegal_opcode(&self) -> Result<()> {
+        Err(Error::IllegalOpcode { instruction: self.memory[self.registers.instr_pointer as usize], instr_pointer: self.registers.instr_pointer }) }
 
     fn perform_load(&mut self, value: Word, dest_reg: u8) -> Result<()> {
         self.registers

@@ -8,7 +8,8 @@ pub fn pair_result<T1, T2, E>(
 }
 
 pub enum Error {
-    InvalidRegisterNumber { number: usize, instr_pointer: Word },
+    IllegalOpcode { instruction: Word, instr_pointer: Word },
+    InvalidRegister { number: usize, instr_pointer: Word },
     DivisionByZero { instr_pointer: Word },
     HaltSignal { instr_pointer: Word },
 }
