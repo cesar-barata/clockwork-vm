@@ -11,7 +11,6 @@ pub enum Error {
     IllegalOpcode { instruction: Word, instr_pointer: Word },
     InvalidRegister { number: usize, instr_pointer: Word },
     DivisionByZero { instr_pointer: Word },
-    HaltSignal { instr_pointer: Word },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

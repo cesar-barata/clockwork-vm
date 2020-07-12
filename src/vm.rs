@@ -4,7 +4,7 @@ use crate::instruction::Instruction;
 use crate::error::{ Error, pair_result, Result };
 use crate::registers::Registers;
 
-pub struct VM {
+pub struct Runtime {
     registers: Registers,
     flag_zero: bool,
     flag_carry: bool,
@@ -12,7 +12,7 @@ pub struct VM {
     running: bool
 }
 
-impl VM {
+impl Runtime {
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
 
     fn init_memory(program: Vec<Word>, memory_vec_size: usize) -> Vec<Word> {
@@ -25,7 +25,7 @@ impl VM {
 
     pub fn new_with_memory_size(program: Vec<Word>, memory_size: usize) -> Self {
         let mem_vec_size = memory_size / std::mem::size_of::<Word>();
-        VM {
+        Runtime {
             registers: Registers::default(),
             flag_zero: false,
             flag_carry: false,
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn brand_new_vm_has_default_values() {
         let program = vec![0; 0];
-        let vm = VM::new(program);
+        let vm = Runtime::new(program);
         // assert_eq!(vm.old_registers, default_reg_values());
         assert_eq!(vm.running, false);
     }
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn fetching_next_instruction_consumes_previous_ones() {
         let program = vec![7, 8, 9];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         let instruction = vm.consume_next_instr();
         let expected = 7;
@@ -251,7 +251,7 @@ mod tests {
             0b00000011_0000000000000000000000000000000011001010010100_0000000001i64, // load $12948, d3
         ];
 
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         vm.perform_next_instr();
         assert_eq!(expected_d0, vm.registers.data0);
@@ -288,7 +288,7 @@ mod tests {
             0b00000000_0000000000000000000000000000000000000000010001_0000000001i64,   // load $17, d0
             0b000000000000000000000000001_000000000000000000000000000_0000001100i64,   // copy d0, d1
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         assert_eq!(0, vm.registers.data0);
         assert_eq!(0, vm.registers.data1);
@@ -314,7 +314,7 @@ mod tests {
             0b00000001_0000000000000000000000000000000000101110111000_0000000001i64,
             0b000000000000000011_000000000000000001_000000000000000000_0000000010i64
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         vm.perform_next_instr();
         assert_eq!(0b11111010000, vm.registers.data0);
@@ -344,7 +344,7 @@ mod tests {
             0b00000001_0000000000000000000000000000000000101110111000_0000000001i64,
             0b000000000000000011_000000000000000001_000000000000000000_0000000011i64
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         vm.perform_next_instr();
         assert_eq!(0b11111010000, vm.registers.data0);
@@ -375,7 +375,7 @@ mod tests {
             0b000000000000000011_000000000000000001_000000000000000000_0000000100i64
         ];
 
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         vm.perform_next_instr();
         assert_eq!(0b11111010000, vm.registers.data0);
@@ -403,7 +403,7 @@ mod tests {
             0b00000001_0000000000000000000000000000000000010011010010_0000000001i64,    // load $1234, d1
             0b000000000000011_0000000000010_0000000000001_0000000000000_0000001011i64,  // div d0 d1 d2 d3
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         vm.perform_next_instr();  // load $4321, d0
         vm.perform_next_instr();  // load $1234, d1
@@ -423,7 +423,7 @@ mod tests {
             0b000000000000000000000000010_000000000000000000000000000_0000000101i64,    // cmp d0, d2
             0b000000000000000000000000000_000000000000000000000000001_0000000101i64,    // cmp d1, d0
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         vm.perform_next_instr();  // load $2000, d0
         vm.perform_next_instr();  // load $3000, d1
@@ -448,7 +448,7 @@ mod tests {
             0b00000001_0000000000000000000000000000000000000000000001_0000000001i64,    // load $1, d1
             0b000000000000000000000000000000000000000000000000000001_0000000110i64,     // jmp d1
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
 
         assert_eq!(0, vm.registers.instr_pointer);
         assert_eq!(0, vm.registers.data0);
@@ -506,7 +506,7 @@ mod tests {
             0b000000000000000000000000000000000000000000000000000011_0000001000i64,     // jnz d3            ; jump back to step 2 (0-based)
             0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt              ; stop (result is in d0)
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
         vm.run();
     
         assert_eq!(1, vm.registers.data0);
@@ -521,7 +521,7 @@ mod tests {
             0b000000000000000000000000000000000000000000000000000000_0000001101i64,     // inc d0
             0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
         vm.run();
 
         assert_eq!(expected_value, vm.registers.data0);
@@ -536,7 +536,7 @@ mod tests {
             0b000000000000000000000000000000000000000000000000000000_0000001110i64,     // dec d0
             0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
         vm.run();
 
         assert_eq!(expected_value, vm.registers.data0);
@@ -549,7 +549,7 @@ mod tests {
             0b000000000000000000000000000_000000000000000000000000000_0000010000i64,    // strm d0, @0
             0b0000000000000000000000000000000000000000000000000000000000000000i64,      // halt
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
         vm.run();
 
         assert_eq!(449, vm.memory[0]);
@@ -563,7 +563,7 @@ mod tests {
             0b000000000000000000000000001_000000000000000000000000000_0000001111i64,    // ldm @0, d1
             0b000000000000000000000000000000000000000000000000000000_0000000000i64,      // halt
         ];
-        let mut vm = VM::new(program);
+        let mut vm = Runtime::new(program);
         vm.run();
 
         assert_eq!(449, vm.registers.data1);
