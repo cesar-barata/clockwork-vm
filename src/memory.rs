@@ -14,7 +14,7 @@ impl Memory {
     }
 
     pub fn write(&mut self, address: usize, data: Word) -> Result<()> {
-        if address < 0 || address as usize >= self.buffer.len() {
+        if address as usize >= self.buffer.len() {
             Err(Error::InvalidMemoryAddress { requested_address: address, upper_bound: self.buffer.len() })
         } else {
             self.buffer[address as usize] = data;
@@ -23,7 +23,7 @@ impl Memory {
     }
 
     pub fn read(&self, address: usize) -> Result<Word> {
-        if address < 0 || address as usize >= self.buffer.len() {
+        if address as usize >= self.buffer.len() {
             Err(Error::InvalidMemoryAddress { requested_address: address, upper_bound: self.buffer.len() })
         } else {
             Ok(self.buffer[address as usize])
