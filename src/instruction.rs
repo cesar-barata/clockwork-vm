@@ -1,4 +1,4 @@
-use crate::vm::Word;
+use crate::runtime::Word;
 
 use std::convert::From;
 

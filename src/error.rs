@@ -1,4 +1,4 @@
-use crate::vm::Word;
+use crate::runtime::Word;
 
 #[derive(Debug)]
 pub enum Error {

@@ -1,4 +1,4 @@
-use crate::vm::Word;
+use crate::runtime::Word;
 use crate::error::{ Error, Result };
 
 pub struct Memory {
