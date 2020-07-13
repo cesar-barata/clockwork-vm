@@ -1,3 +1,4 @@
+mod util;
 mod instruction;
 mod registers;
 mod error;

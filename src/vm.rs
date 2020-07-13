@@ -1,24 +1,26 @@
 pub type Word = i64;
 
+use crate::util::pair_result;
 use crate::instruction::Instruction;
-use crate::error::{ Error, pair_result, Result };
+use crate::error::{ Error, Result };
+use crate::memory::Memory;
 use crate::registers::Registers;
 
 pub struct Runtime {
     registers: Registers,
     flag_zero: bool,
     flag_carry: bool,
-    memory: Vec<Word>,
-    running: bool
+    memory: Memory,
+    running: bool,
 }
 
 impl Runtime {
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
 
-    fn init_memory(program: Vec<Word>, memory_vec_size: usize) -> Vec<Word> {
-        let mut memory = vec![0; memory_vec_size];
+    fn init_memory(program: Vec<Word>, memory_vec_size: usize) -> Memory {
+        let mut memory = Memory::new_with_size(memory_vec_size);
         for (index, inst) in program.iter().enumerate() {
-            memory[index] = *inst;
+            memory.write(index as usize, *inst).expect("Error loading program");
         }
         memory
     }
@@ -40,7 +42,7 @@ impl Runtime {
 
     fn read_next_inst(&self) -> Word {
         let current_ip = self.registers.instr_pointer as usize;
-        self.memory[current_ip]
+        self.memory.read(current_ip).unwrap()
     }
 
     fn consume_next_instr(&mut self) -> Word {
@@ -82,7 +84,8 @@ impl Runtime {
     }
 
     fn handle_illegal_opcode(&self) -> Result<()> {
-        Err(Error::IllegalOpcode { instruction: self.memory[self.registers.instr_pointer as usize], instr_pointer: self.registers.instr_pointer }) }
+        Err(Error::IllegalOpcode { instruction: self.memory.read(self.registers.instr_pointer as usize).unwrap(), instr_pointer: self.registers.instr_pointer })
+    }
 
     fn perform_load(&mut self, value: Word, dest_reg: u8) -> Result<()> {
         self.registers
@@ -194,13 +197,13 @@ impl Runtime {
     }
 
     fn perform_load_mem(&mut self, src_addr: Word, dest_reg: u8) -> Result<()> {
-        self.registers.write(dest_reg as usize, self.memory[src_addr as usize])
+        self.registers.write(dest_reg as usize, self.memory.read(src_addr as usize).unwrap())
     }
 
     fn perform_store_mem(&mut self, src_reg: u8, dest_addr: Word) -> Result<()> {
         self.registers
             .read(src_reg as usize)
-            .map(|value| self.memory[dest_addr as usize] = value)
+            .map(|value| self.memory.write(dest_addr as usize, value).unwrap())
     }
 }
 
@@ -552,7 +555,7 @@ mod tests {
         let mut vm = Runtime::new(program);
         vm.run();
 
-        assert_eq!(449, vm.memory[0]);
+        assert_eq!(449, vm.memory.read(0).unwrap());
     }
 
     #[test]

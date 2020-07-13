@@ -1,11 +1,5 @@
 use crate::vm::Word;
-
-pub enum Error {
-    InvalidAddress { requested_address: Word, upper_bound: usize },
-    OutOfMemory,
-}
-
-type Result<T> = std::result::Result<T, Error>;
+use crate::error::{ Error, Result };
 
 pub struct Memory {
     buffer: Vec<Word>,
@@ -14,23 +8,23 @@ pub struct Memory {
 impl Memory {
     const DEFAULT_MEMORY_SIZE_BYTES: usize = 2097152;
 
-    fn new_with_size(size_bytes: usize) -> Self {
+    pub fn new_with_size(size_bytes: usize) -> Self {
         let mem_vec_size = size_bytes / std::mem::size_of::<Word>();
         Memory { buffer: vec![0; mem_vec_size] }
     }
 
-    fn write(&mut self, address: Word, data: Word) -> Result<()> {
+    pub fn write(&mut self, address: usize, data: Word) -> Result<()> {
         if address < 0 || address as usize >= self.buffer.len() {
-            Err(Error::InvalidAddress { requested_address: address, upper_bound: self.buffer.len() })
+            Err(Error::InvalidMemoryAddress { requested_address: address, upper_bound: self.buffer.len() })
         } else {
             self.buffer[address as usize] = data;
             Ok(())
         }
     }
 
-    fn read(&self, address: Word) -> Result<Word> {
+    pub fn read(&self, address: usize) -> Result<Word> {
         if address < 0 || address as usize >= self.buffer.len() {
-            Err(Error::InvalidAddress { requested_address: address, upper_bound: self.buffer.len() })
+            Err(Error::InvalidMemoryAddress { requested_address: address, upper_bound: self.buffer.len() })
         } else {
             Ok(self.buffer[address as usize])
         }
